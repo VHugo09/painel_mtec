@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-  # Serviço do banco de dados PostgreSQL
   db:
     image: postgres:13
     container_name: pedidos-db
@@ -14,8 +11,15 @@ services:
       - pedidos_db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    # ======================================================================
+    # ADICIONADO: Healthcheck para garantir que o banco está pronto
+    # ======================================================================
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pedidos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # Serviço da sua aplicação Flask
   app:
     build: .
     container_name: flask-app
@@ -25,11 +29,12 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy # <--- Alteração chave aqui
     environment:
-      DATABASE_URL: postgresql://postgres:2025@db:5432/pedidos_db
-    command: python app.py
+      - FLASK_APP=crud.py
+      - FLASK_DEBUG=1
+      - DATABASE_URL=postgresql://postgres:2025@db:5432/pedidos_db
 
-# Define o volume persistente para o banco de dados
 volumes:
   pedidos_db_data:

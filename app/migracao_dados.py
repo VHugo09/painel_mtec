@@ -3,51 +3,61 @@ import psycopg2
 import os
 from datetime import datetime
 
-# Configurações de Conexão com o Banco de Dados
-DB_HOST = "localhost"
-DB_NAME = "pedidos_db"  # Substitua pelo nome do seu banco de dados
-DB_USER = "postgres"
-DB_PASSWORD = "2025"        # Substitua pela sua senha
-
+# --- FUNÇÃO DE CONEXÃO ATUALIZADA ---
 def get_db_connection():
-    """Cria e retorna uma conexão com o banco de dados."""
-    return psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        client_encoding='utf8'
-    )
+    """
+    Cria e retorna uma conexão com o banco.
+    Tenta usar a variável de ambiente DATABASE_URL (para rodar no Docker).
+    Se não encontrar, usa as configurações locais (para rodar no seu PC).
+    """
+    database_url = os.environ.get('DATABASE_URL')
+
+    if database_url:
+        print("Conectando via DATABASE_URL (ambiente Docker)...")
+        conn_str = database_url.replace("postgresql://", "postgres://")
+        return psycopg2.connect(conn_str)
+    else:
+        print("AVISO: DATABASE_URL não definida. Usando configuração local (localhost).")
+        return psycopg2.connect(
+            host="localhost",
+            database="pedidos_db",
+            user="postgres",
+            password="2025",
+            client_encoding='utf8'
+        )
 
 def migrar_dados_pedidos():
     conn = None
+    planilha_path = os.path.join("dados", "Status_dos_pedidos.xlsm")
+    
     try:
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # 1. Obter o ID do status "Aguardando Montagem" do banco de dados
+        print("Limpando registros antigos importados da planilha...")
+        # Limpa apenas os que foram importados anteriormente para não apagar os criados manualmente
+        cur.execute("DELETE FROM public.pedidos_tb WHERE criado_por = 'Importada Planilha';")
+
         status_aguardando_chegada = "Aguardando Chegada"
         print(f"Buscando o ID para o status: '{status_aguardando_chegada}'...")
-        cur.execute("SELECT id FROM status_td WHERE nome_status = %s;", (status_aguardando_chegada,))
+        cur.execute("SELECT id FROM public.status_td WHERE nome_status = %s;", (status_aguardando_chegada,))
         result = cur.fetchone()
         
         if result is None:
             print(f"Erro: O status '{status_aguardando_chegada}' não foi encontrado na tabela status_td.")
-            print("Por favor, certifique-se de ter inserido este status no banco de dados primeiro.")
             return
             
         status_id = result[0]
         print(f"ID para '{status_aguardando_chegada}' encontrado: {status_id}")
 
-        # 2. Ler os dados da planilha Excel
-        print("Lendo dados da planilha Excel...")
-        planilha_path = os.path.join("dados", "Status_dos_pedidos.xlsm")
-        df_excel = pd.read_excel(planilha_path)
+        print(f"Lendo todos os dados da planilha '{planilha_path}'...")
+        df_excel = pd.read_excel(planilha_path, sheet_name=0)
+        df_excel.dropna(how='all', inplace=True)
+        
+        print(f"Encontrados {len(df_excel)} pedidos na planilha.")
 
-        # 3. Preparar e padronizar os nomes das colunas
         df_excel.columns = df_excel.columns.str.strip().str.lower().str.replace(' ', '_')
 
-        # 4. Renomear as colunas para o formato final esperado no banco de dados
         df_excel = df_excel.rename(columns={
             "pedido": "codigo_pedido",
             "equipamento": "equipamento",
@@ -57,49 +67,43 @@ def migrar_dados_pedidos():
             "qtd_maquinas": "quantidade"
         })
 
-        # Adicionar a coluna de prioridade
-        df_excel['prioridade'] = range(1, len(df_excel) + 1)
+        # Define a prioridade inicial baseada na ordem da planilha
+        cur.execute("SELECT COALESCE(MAX(prioridade), 0) FROM public.pedidos_tb")
+        max_prioridade_existente = cur.fetchone()[0]
+        df_excel['prioridade'] = range(max_prioridade_existente + 1, len(df_excel) + max_prioridade_existente + 1)
         
-        # Opcional, mas útil para o erro 'NaT' se persistir:
-        # Imprime a primeira linha para verificar o formato dos dados
-        # print("Dados da primeira linha (após o processamento):")
-        # print(df_excel.iloc[0])
-
-        # 5. Inserir os dados na tabela pedidos_tb
-        print("Inserindo dados na tabela pedidos_tb...")
+        print("Inserindo novos dados na tabela pedidos_tb...")
+        pedidos_processados = 0
         for index, row in df_excel.iterrows():
+            codigo_pedido = row.get('codigo_pedido')
+            if pd.isna(codigo_pedido):
+                codigo_pedido = None
 
             data_criacao = datetime.now()
-            perfil_altecao = "Importada Planilha"
+            criado_por_val = "Importada Planilha"
+            status_urgente = False
 
             query = """
-            INSERT INTO pedidos_tb (codigo_pedido, equipamento, pv, descricao_servico, status_id, data_criacao, quantidade, prioridade, perfil_alteracao)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (codigo_pedido) DO UPDATE
-            SET
-                equipamento = EXCLUDED.equipamento,
-                pv = EXCLUDED.pv,
-                descricao_servico = EXCLUDED.descricao_servico,
-                status_id = EXCLUDED.status_id,
-                data_criacao = EXCLUDED.data_criacao,
-                quantidade = EXCLUDED.quantidade,
-                prioridade = EXCLUDED.prioridade,
-                perfil_alteracao = EXCLUDED.perfil_alteracao;
+            INSERT INTO public.pedidos_tb (codigo_pedido, equipamento, pv, descricao_servico, status_id, data_criacao, quantidade, prioridade, perfil_alteracao, urgente, criado_por)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """
             cur.execute(query, (
-                row['codigo_pedido'],
-                row['equipamento'],
-                row['pv'],
-                row['descricao_servico'],
-                status_id,
+                codigo_pedido, 
+                row.get('equipamento'), 
+                row.get('pv'),
+                row.get('descricao_servico'), 
+                status_id, 
                 data_criacao,
-                row['quantidade'],
-                row['prioridade'],
-                perfil_altecao
+                row.get('quantidade'), 
+                row.get('prioridade'), 
+                criado_por_val, # perfil_alteracao também recebe o valor inicial
+                status_urgente,
+                criado_por_val  # criado_por recebe o valor inicial
             ))
+            pedidos_processados += 1
 
         conn.commit()
-        print("Dados migrados com sucesso!")
+        print(f"Dados migrados com sucesso! Total de {pedidos_processados} pedidos processados.")
 
     except psycopg2.Error as e:
         print(f"Erro no banco de dados: {e}")
@@ -108,8 +112,11 @@ def migrar_dados_pedidos():
     except FileNotFoundError:
         print(f"Erro: O arquivo de planilha não foi encontrado. Verifique se o caminho '{planilha_path}' está correto.")
     except KeyError as e:
-        print(f"Erro: A coluna {e} não foi encontrada no DataFrame. Verifique a ortografia das colunas na planilha.")
-        print(f"Nomes das colunas do DataFrame após o processamento: {df_excel.columns.tolist()}")
+        print(f"Erro: A coluna {e} não foi encontrada. Verifique os nomes das colunas na sua planilha Excel.")
+    except Exception as e:
+        print(f"Ocorreu um erro inesperado: {e}")
+        if conn:
+            conn.rollback()
     finally:
         if conn:
             cur.close()

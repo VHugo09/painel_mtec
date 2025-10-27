@@ -290,7 +290,7 @@
             let rowContent = '';
             
             if (tipoFiltro === 'andamento') {
-                const criadoPor = p.criado_por || 'N/A';
+                const criadoPor = p.criado_por || p.perfil_alteracao || 'N/A'; // <--- ALTERE ESTA LINHA
                 rowContent = `<td>${p.pv}${urgentIcon}</td><td>${p.equipamento}</td><td>${p.quantidade}</td><td>${p.descricao_servico}</td><td>${p.imagem_nome ?? 'N/A'}</td><td><span class="badge ${badgeClass}">${p.status ?? 'N/A'}</span></td><td>${criadoPor}</td><td>${dataCriacao}</td>`;
             } else {
                 const finalizadoPor = p.perfil_alteracao || 'N/A';

@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text, Column, Integer, String, DateTime, B
 from sqlalchemy.orm import declarative_base, sessionmaker
 from functools import wraps
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from werkzeug.security import generate_password_hash, check_password_hash
 import traceback
@@ -19,7 +19,6 @@ CORS(app)
 # --- Configurações de Sessão ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(24)
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 
 # --- Conexão com o Banco de Dados ---
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://postgres:2025@localhost:5432/pedidos_db')
@@ -36,6 +35,7 @@ class UsuarioTb(Base):
     password_hash = Column(String(256), nullable=False)
     nome_completo = Column(String(120))
     nivel_acesso = Column(String(50), default='operador', nullable=False)
+    tipo_usuario = Column(String(50), default='normal', nullable=False) # Opções: 'normal' ou 'tv'
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -70,6 +70,7 @@ class PedidosTb(Base):
     perfil_alteracao = Column(String)
     urgente = Column(Boolean, default=False)
     tem_office = Column(Boolean, default=False)
+    criado_por = Column(String)
 
 class HistoricoStatusTb(Base):
     __tablename__ = 'historico_status_tb'
@@ -80,7 +81,6 @@ class HistoricoStatusTb(Base):
     data_mudanca = Column(DateTime(timezone=True), default=lambda: datetime.now(fuso_brasilia))
     alterado_por = Column(String)
 
-# --- FUNÇÃO PARA POPULAR DADOS INICIAIS ---
 def popular_dados_iniciais(db_session):
     status_iniciais = ["Aguardando Chegada", "Backlog", "Em Montagem", "Concluído", "Pendente", "Cancelado"]
     imagens_iniciais = ["W11 PRO", "W11 PRO ETQ", "Linux", "SLUI (SOLUÇÃO DE PROBLEMAS)", "FREEDOS"]
@@ -127,6 +127,13 @@ def login():
         try:
             user = db_session.query(UsuarioTb).filter_by(username=username).first()
             if user and user.check_password(password):
+                if user.tipo_usuario == 'tv':
+                    session.permanent = True
+                    app.permanent_session_lifetime = timedelta(days=3650)
+                else:
+                    session.permanent = True
+                    app.permanent_session_lifetime = timedelta(hours=1)
+
                 session.update({'logged_in': True, 'username': user.username, 'nivel_acesso': user.nivel_acesso})
                 flash("Login efetuado com sucesso!", "success")
                 return redirect(url_for('home'))
@@ -169,16 +176,16 @@ def handle_usuarios():
     try:
         if request.method == 'GET':
             usuarios_db = db_session.query(UsuarioTb).order_by(UsuarioTb.id).all()
-            return jsonify([{"id": u.id, "username": u.username, "nome_completo": u.nome_completo, "nivel_acesso": u.nivel_acesso} for u in usuarios_db])
+            return jsonify([{"id": u.id, "username": u.username, "nome_completo": u.nome_completo, "nivel_acesso": u.nivel_acesso, "tipo_usuario": u.tipo_usuario} for u in usuarios_db])
         
         elif request.method == 'POST':
             data = request.get_json()
-            if not all(data.get(k) for k in ['username', 'nome_completo', 'password', 'nivel_acesso']):
+            if not all(data.get(k) for k in ['username', 'nome_completo', 'password', 'nivel_acesso', 'tipo_usuario']):
                 return jsonify({'erro': 'Todos os campos são obrigatórios.'}), 400
             if db_session.query(UsuarioTb).filter_by(username=data['username']).first():
                 return jsonify({'erro': f'O username "{data["username"]}" já está em uso.'}), 409
             
-            novo_usuario = UsuarioTb(username=data['username'], nome_completo=data['nome_completo'], nivel_acesso=data['nivel_acesso'])
+            novo_usuario = UsuarioTb(username=data['username'], nome_completo=data['nome_completo'], nivel_acesso=data['nivel_acesso'], tipo_usuario=data['tipo_usuario'])
             novo_usuario.set_password(data['password'])
             db_session.add(novo_usuario)
             db_session.commit()
@@ -203,6 +210,7 @@ def handle_single_usuario(user_id):
             data = request.get_json()
             if 'nome_completo' in data: usuario.nome_completo = data['nome_completo']
             if 'nivel_acesso' in data: usuario.nivel_acesso = data['nivel_acesso']
+            if 'tipo_usuario' in data: usuario.tipo_usuario = data['tipo_usuario']
             if data.get('password'): usuario.set_password(data['password'])
             db_session.commit()
             return jsonify({'mensagem': f'Utilizador {usuario.username} atualizado com sucesso!'})
@@ -260,6 +268,8 @@ def get_pedidos():
 def add_pedido():
     data = request.json
     data_criacao = datetime.now(fuso_brasilia)
+    username = session.get('username', 'Anónimo')
+
     with engine.connect() as conn, conn.begin():
         max_p = conn.execute(text("""
             SELECT COALESCE(MAX(prioridade), 0) FROM public.pedidos_tb
@@ -268,9 +278,22 @@ def add_pedido():
         data['prioridade'] = max_p + 1
         
         novo_pedido_id = conn.execute(text("""
-            INSERT INTO public.pedidos_tb (pv, equipamento, quantidade, descricao_servico, status_id, imagem_id, perfil_alteracao, data_criacao, urgente, prioridade, tem_office) 
-            VALUES (:pv, :eq, :qtd, :serv, :s_id, :i_id, :perfil, :data_c, :urg, :prio, :office) RETURNING id
-        """), {**data, "eq": data["equipamento"], "qtd": data["quantidade"], "serv": data["descricao_servico"], "s_id": data["status_id"], "i_id": data["imagem_id"], "perfil": session.get('username'), "data_c": data_criacao, "urg": data.get('urgente', False), "prio": data['prioridade'], "office": data.get('tem_office', False)}).scalar_one()
+            INSERT INTO public.pedidos_tb (pv, equipamento, quantidade, descricao_servico, status_id, imagem_id, perfil_alteracao, data_criacao, urgente, prioridade, tem_office, criado_por) 
+            VALUES (:pv, :eq, :qtd, :serv, :s_id, :i_id, :perfil, :data_c, :urg, :prio, :office, :criado_por) RETURNING id
+        """), {
+            **data, 
+            "eq": data["equipamento"], 
+            "qtd": data["quantidade"], 
+            "serv": data["descricao_servico"], 
+            "s_id": data["status_id"], 
+            "i_id": data["imagem_id"], 
+            "perfil": username, 
+            "data_c": data_criacao, 
+            "urg": data.get('urgente', False), 
+            "prio": data['prioridade'], 
+            "office": data.get('tem_office', False),
+            "criado_por": username
+        }).scalar_one()
         
         conn.execute(text("INSERT INTO public.historico_status_tb (pedido_id, status_alterado, data_mudanca, alterado_por) VALUES (:p_id, :s_alt, :data_m, :por)"),
             {"p_id": novo_pedido_id, "s_alt": data["status_id"], "data_m": data_criacao, "por": session.get('username')})
@@ -392,7 +415,6 @@ def gerar_relatorio_api():
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0, tzinfo=fuso_brasilia)
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59, tzinfo=fuso_brasilia)
         
-        # Query 1: Busca pedidos FINALIZADOS (concluídos/cancelados) DENTRO DO PERÍODO
         query_finalizadas = text("""
             SELECT
                 s.nome_status as status,
@@ -406,7 +428,6 @@ def gerar_relatorio_api():
             GROUP BY status, tipo;
         """)
         
-        # Query 2: Busca o ESTADO ATUAL dos pedidos em aberto (sem filtro de data)
         query_atuais = text("""
             SELECT
                 CASE 
@@ -425,7 +446,6 @@ def gerar_relatorio_api():
         result_finalizadas = db_session.execute(query_finalizadas, {"start_date": start_date, "end_date": end_date}).mappings().all()
         result_atuais = db_session.execute(query_atuais).mappings().all()
 
-        # Estrutura de dados para armazenar os totais
         dados = {
             'realizadas': {'PV': None, 'OP': None},
             'canceladas': {'PV': None, 'OP': None},
@@ -433,7 +453,6 @@ def gerar_relatorio_api():
             'pendentes': {'PV': None, 'OP': None}
         }
 
-        # Processa os resultados
         for row in result_finalizadas:
             categoria = 'realizadas' if row['status'] == 'Concluído' else 'canceladas'
             dados[categoria][row['tipo']] = {'pedidos': row['total_pedidos'], 'unidades': row['total_unidades']}
@@ -444,7 +463,6 @@ def gerar_relatorio_api():
             elif row['status_agrupado'] == 'Pendente':
                 dados['pendentes'][row['tipo']] = {'pedidos': row['total_pedidos'], 'unidades': row['total_unidades']}
         
-        # Função auxiliar para formatar cada seção do relatório
         def construir_secao(titulo, dados_secao):
             texto = f"<strong><u>{titulo}:</u></strong>\n"
             if not dados_secao['PV'] and not dados_secao['OP']:
@@ -455,7 +473,6 @@ def gerar_relatorio_api():
                 texto += f"    • {dados_secao['OP']['pedidos']} OP com {dados_secao['OP']['unidades']} unidades de Teravix\n"
             return texto
 
-        # Monta o texto final, adicionando seções apenas se tiverem conteúdo
         data_formatada = end_date.strftime('%d/%m/%Y')
         if start_date_str != end_date_str:
             data_formatada = f"{start_date.strftime('%d/%m/%Y')} a {data_formatada}"
@@ -470,7 +487,7 @@ def gerar_relatorio_api():
         if dados['pendentes']['PV'] or dados['pendentes']['OP']:
             partes_relatorio.append(construir_secao("Pendentes", dados['pendentes']))
 
-        partes_relatorio.append(construir_secao("Backlog (Inclui Em Montagem)", dados['backlog']))
+        partes_relatorio.append(construir_secao("Backlog", dados['backlog']))
 
         relatorio_texto = "\n".join(partes_relatorio)
 
@@ -482,7 +499,6 @@ def gerar_relatorio_api():
     finally:
         db_session.close()
 
-# --- ROTA ADICIONADA PARA CORRIGIR O ERRO ---
 @app.route("/relatorios")
 @login_required
 def relatorios_page():

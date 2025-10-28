@@ -2,7 +2,6 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Produção MTEC</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -30,23 +29,15 @@
             font-family: 'Poppins', sans-serif;
             margin: 0;
             padding: 20px;
-            overflow-x: hidden;
-            overflow-y: auto;
-            height: 100vh;
-            box-sizing: border-box;
+            overflow: hidden;
         }
-
         .grid-container {
             display: grid;
             grid-template-columns: 2fr 1fr 1fr 1fr;
-            grid-template-rows: auto auto;
+            grid-template-rows: 1fr auto;
             gap: 20px;
-            min-height: 100vh;
-            height: auto;
-            overflow: visible;
-            box-sizing: border-box;
+            height: calc(100vh - 40px);
         }
-
         .grid-item {
             display: flex;
             flex-direction: column;
@@ -181,8 +172,9 @@
                     <p class="sub-value" id="metric-media-dia-maq">0.0 máq.</p>
                 </div>
                 <div class="metric-box">
-                    <h4 id="desempenho-title">Desempenho Semanal</h4>
+                    <h4 id="desempenho-title">Desempenho Semanal (Meta: 200 máq.)</h4>
                     <div id="desempenho-container" class="progress-bar-container"></div>
+                    <h4>Atividades</h4>
                 </div>
                 <div class="metric-box">
                     <h4>Recorde Diário no Mês</h4>
@@ -303,7 +295,7 @@
             const container = document.getElementById('desempenho-container');
             if (!container) return;
             container.innerHTML = '';
-            document.getElementById('desempenho-title').textContent = `Desempenho Semanal:`;
+            document.getElementById('desempenho-title').textContent = `Desempenho Semanal (Meta: ${meta} máq.)`;
 
             if (Array.isArray(desempenho) && desempenho.length > 0) {
                 const hoje = new Date();

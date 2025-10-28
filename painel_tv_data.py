@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import pytz
 import traceback
+import requests
 
 # --- CONFIGURAÇÕES ---
 DB_URL = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://postgres:2025@localhost:5432/pedidos_db')

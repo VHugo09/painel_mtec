@@ -9,6 +9,7 @@ from datetime import datetime
 import pytz
 from werkzeug.security import generate_password_hash, check_password_hash
 import traceback
+import json
 
 # Definir fuso horário de Brasília
 fuso_brasilia = pytz.timezone("America/Sao_Paulo")
@@ -351,6 +352,63 @@ def reordenar_prioridade():
     return jsonify({'mensagem': 'Prioridade atualizada com sucesso!'}), 200
 
 # --- OUTRAS ROTAS DA API ---
+@app.route('/atividade', methods=['POST'])
+def receber_atividade():
+    """Função que processa as requisições POST do aplicativo Kivy."""
+    
+    # Verifica se a requisição contém dados JSON
+    if not request.is_json:
+        return jsonify({"mensagem": "Requisição não contém JSON válido"}), 400
+
+    # Acessa os dados JSON enviados pelo Kivy
+    dados_recebidos = request.get_json()
+
+    # --- Acesso aos dados ---
+    # Aqui é onde você acessa os valores enviados. 
+    # Por exemplo, se quiser o nome do usuário ou o serial bipado:
+    
+    usuario = dados_recebidos.get('usuario', 'N/A')
+    status = dados_recebidos.get('status', 'N/A')
+    serial = dados_recebidos.get('serial', 'N/A')
+    etapa = dados_recebidos.get('etapa', 'N/A')
+    tempo_total = dados_recebidos.get('tempo_total_segundos','N/A')
+    
+    # Imprime os dados recebidos no console do servidor para debug
+    print("--- DADOS RECEBIDOS DO KIVY ---")
+    print(f"Status do Evento: {status}")
+    print(f"Usuário: {usuario}")
+    print(f"Serial: {serial}")
+    print(f"Etapa: {etapa}")
+    print(f"Tempo: {tempo_total} ")
+    print(f"Payload Completo: {json.dumps(dados_recebidos, indent=4)}")
+    print("--------------------------------")
+
+    global atividades_atuais
+
+    if 'atividades_atuais' not in globals():
+        atividades_atuais = {}
+
+    atividades_atuais[usuario] = {
+        "usuario": usuario,
+        "status": status,
+        "etapa": etapa,
+        "serial": serial,
+        "tempo_total": tempo_total
+    }
+    
+    # Responde ao Kivy com sucesso (código 200) e uma mensagem
+    # O Kivy espera esse código 200 para saber que o envio foi OK.
+    return jsonify({
+        "sucesso": True, 
+        "mensagem": f"Dados de {status} recebidos com sucesso."
+    })
+
+@app.route('/api/atividades', methods=['GET'])
+def listar_atividades():
+    """Retorna as atividades atuais dos usuários."""
+    global atividades_atuais
+    return jsonify(atividades_atuais if 'atividades_atuais' in globals() else {})
+
 @app.route("/pedidos/<int:pedido_id>/historico", methods=["GET"])
 @login_required
 def get_historico_pedido(pedido_id):
@@ -421,6 +479,8 @@ def gerar_relatorio_api():
             WHERE s.nome_status IN ('Backlog', 'Em Montagem', 'Pendente')
             GROUP BY status_agrupado, tipo;
         """)
+
+        
 
         result_finalizadas = db_session.execute(query_finalizadas, {"start_date": start_date, "end_date": end_date}).mappings().all()
         result_atuais = db_session.execute(query_atuais).mappings().all()

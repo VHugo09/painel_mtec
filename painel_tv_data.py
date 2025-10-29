@@ -4,13 +4,12 @@ from datetime import datetime
 import os
 import pytz
 import traceback
-import requests
 
 # --- CONFIGURAÇÕES ---
 DB_URL = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://postgres:2025@localhost:5432/pedidos_db')
 engine = create_engine(DB_URL)
 FUSO_BRASILIA = pytz.timezone("America/Sao_Paulo")
-META_SEMANAL = 200
+META_SEMANAL = 500
 
 def to_safe_dict(df):
     if df.empty: return []
@@ -116,4 +115,3 @@ def get_painel_data():
         traceback.print_exc()
         # Retorna um objeto JSON com o erro, o que é melhor para depuração
         return {"error": "Falha ao processar os dados.", "details": str(e)}, 500
-

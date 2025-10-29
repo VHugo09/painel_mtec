@@ -121,6 +121,32 @@
             color: var(--text-light);
             font-weight: 600;
         }
+
+        #tabela-atividades {
+        width: 100%;
+        table-layout: fixed; /* ajuda a distribuir melhor o espaço */
+        }
+
+        /* Deixa as colunas com bordas suaves e visual limpo */
+        #tabela-atividades th,
+        #tabela-atividades td {
+        padding: 5px;
+        text-align: center; /* <-- centraliza o texto horizontalmente */
+        vertical-align: middle; /* <-- centraliza o texto verticalmente */
+        }
+
+        /* Cabeçalho mais destacado */
+        #tabela-atividades thead th {
+        background-color: #007BFF;
+        color: white;
+        font-weight: bold;
+        }
+
+
+        /* Quando houver atualização, pisca levemente */
+        .nova-linha {
+        animation: destaque 1s ease;
+        }
     </style>
 </head>
 <body>
@@ -175,7 +201,19 @@
                     <h4 id="desempenho-title">Desempenho Semanal (Meta: 200 máq.)</h4>
                     <div id="desempenho-container" class="progress-bar-container"></div>
                     <h4>Atividades</h4>
-                </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                <th>Funcionário</th>
+                                <th>Etapa</th>
+                                <th>Ultimo Serial Bipado</th>
+                                <th>Status</th>
+                                <th>Tempo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-atividades"></tbody>
+                        </table>
+                    </div>
                 <div class="metric-box">
                     <h4>Recorde Diário no Mês</h4>
                     <p class="value" id="metric-recorde-pedidos">0</p>
@@ -334,6 +372,97 @@
                 });
             }
         }
+        // FUNÇÕES DE ATIVIDADES E TEMPO
+
+        const timers = new Map(); // Guarda todos os timers por funcionário
+
+        // Função para formatar segundos em hh:mm:ss
+        function formatTime(seconds) {
+        const h = String(Math.floor(seconds / 3600)).padStart(2, "0");
+        const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
+        const s = String(seconds % 60).padStart(2, "0");
+        return `${h}:${m}:${s}`;
+        }
+
+        // Função que inicia ou atualiza um timer
+        function iniciarOuAtualizarTimer(funcionario, td, status) {
+        // Se ainda não existir, cria o registro do timer
+        if (!timers.has(funcionario)) {
+            timers.set(funcionario, {
+            count: 0,
+            interval: null
+            });
+        }
+
+        const timer = timers.get(funcionario);
+
+        // Se o status for "Pausado" ou "Finalizado", para o contador
+        if (status.toLowerCase() === "pausado" || status.toLowerCase() === "finalizado") {
+            if (timer.interval) {
+            clearInterval(timer.interval);
+            timer.interval = null;
+            }
+        } else {
+            // Se o timer não está rodando, inicia
+            if (!timer.interval) {
+            timer.interval = setInterval(() => {
+                timer.count++;
+                td.textContent = formatTime(timer.count);
+            }, 1000);
+            }
+        }
+
+        // Atualiza o texto da célula para o valor atual
+        td.textContent = formatTime(timer.count);
+        }
+
+
+        async function carregarAtividades() {
+            try {
+                // Faz a requisição para sua API
+                const resposta = await fetch("/api/atividades");
+                const atividades = await resposta.json();
+
+                // Seleciona a tabela onde os dados serão exibidos
+                const tabela = document.getElementById("tabela-atividades");
+                tabela.innerHTML = ""; // limpa antes de adicionar novas linhas
+
+                // Percorre cada funcionário e suas informações
+                for (const [funcionario, info] of Object.entries(atividades)) {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td>${funcionario}</td>
+                    <td>${info.etapa}</td>
+                    <td>${info.serial}</td>
+                    <td>${
+
+                        info.status === "pausado" ? "⏸ Pausado" :
+                        info.status === "finalizado" ? "✅ Finalizado" :
+                        "Em andamento"
+                        
+                        }</td>
+                    <td class="timer">00:00:00</td>
+                `;
+
+                tabela.appendChild(row);
+                // Pega a célula do timer
+                const tdTimer = row.querySelector(".timer");
+
+                // Inicia ou atualiza o timer conforme o status
+                iniciarOuAtualizarTimer(funcionario, tdTimer, info.status);
+                }
+
+            } catch (erro) {
+                console.error("Erro ao carregar atividades:", erro);
+            }
+            }
+
+            // Chama a função automaticamente a cada 5 segundos
+            setInterval(carregarAtividades, 5000);
+
+            // Chama uma vez ao abrir a página
+            carregarAtividades();
 
         async function atualizarPainel() {
             try {

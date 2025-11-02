@@ -59,11 +59,15 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('relatorios_page') %}active{% endif %}" href="{{ url_for('relatorios_page') }}">Gerador de Relatórios</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('bipador_page') %}active{% endif %}" href="{{ url_for('bipador_page') }}">Biapador</a>
+                    </li>
                     {% if session.nivel_acesso == 'admin' %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('usuarios_page') %}active{% endif %}" href="{{ url_for('usuarios_page') }}">Gerenciar Usuários</a>
                     </li>
                     {% endif %}
+                    
                 </ul>
                 <span class="navbar-text text-white-50 me-3">
                     Logado como: <strong>{{ session.username }}</strong>

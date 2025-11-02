@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bipador de Produção com Cronômetro e Etapas</title>
+    <!-- Carrega Tailwind CSS para estilização moderna e responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Estilo Customizado com Variáveis (Dark/Laranja) -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+        :root {
+            --dark-bg: #363636; /* Fundo principal (similar ao fundo do logo) */
+            --dark-card: #454545; /* Fundo de cartões e navbar */
+            --dark-border: #5a5a5a; /* Bordas e linhas divisórias */
+            --primary-accent: #ff6600; /* Cor de destaque principal (laranja) */
+            --light-text: #FFFFFF; /* Texto claro */
+            --secondary-text: #cccccc; /* Texto secundário */
+            --input-bg: #3c3c3c; /* Fundo do input (um pouco mais escuro que o card) */
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+        }
+        /* Aplica a cor de fundo e texto principal */
+        .bg-dark-bg { background-color: var(--dark-bg); }
+        .bg-dark-card { background-color: var(--dark-card); }
+        .text-light-text { color: var(--light-text); }
+        .text-secondary-text { color: var(--secondary-text); }
+        .text-primary-accent { color: var(--primary-accent); }
+        .border-dark-border { border-color: var(--dark-border); }
+        .bg-primary-accent { background-color: var(--primary-accent); }
+        
+        /* Ajustes específicos de botões para o tema dark */
+        .btn-green { background-color: #3b82f6; } /* Azul para START */
+        .btn-yellow { background-color: #f59e0b; }
+        .btn-red { background-color: #ef4444; }
+
+        /* Estilo para botões de seleção de etapa */
+        .btn-etapa {
+            background-color: var(--input-bg);
+            border: 2px solid var(--dark-border);
+            color: var(--light-text);
+            transition: all 0.2s;
+        }
+        .btn-etapa:hover {
+            border-color: var(--primary-accent);
+            background-color: #4c4c4c;
+        }
+        .btn-etapa.selected {
+            background-color: var(--primary-accent);
+            border-color: var(--light-text);
+            color: black;
+            font-weight: bold;
+        }
+
+        .focus-accent:focus {
+            border-color: var(--primary-accent) !important;
+            box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.5); /* Sombra suave laranja */
+        }
+    </style>
+</head>
+<body class="bg-dark-bg min-h-screen flex flex-col items-center p-4">
+
+    <!-- Container Principal do Aplicativo -->
+    <div class="w-full max-w-md bg-dark-card shadow-2xl rounded-xl p-6 md:p-8 space-y-6">
+
+        <h1 class="text-3xl font-extrabold text-primary-accent text-center border-b-2 border-dark-border pb-2">
+            Controle de Produção
+        </h1>
+        
+        <!-- Identificação Fixa (Terminal) -->
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-secondary-text">Usuário:</label>
+            <p id="user-display" class="w-full p-2 border-2 border-dark-border rounded-lg bg-input-bg text-light-text text-lg font-mono break-all text-sm">
+                <!-- ID de usuário injetado pelo JavaScript -->
+            </p>
+        </div>
+
+        <!-- 1. TELA DE SELEÇÃO DE ETAPA (Inicialmente Visível) -->
+        <div id="step-selection-screen" class="space-y-6">
+            <h2 class="text-2xl font-bold text-light-text text-center">Selecione a Etapa Atual</h2>
+            
+            <div id="etapa-buttons" class="grid grid-cols-2 gap-4">
+                <!-- Botões de Etapa serão injetados aqui -->
+            </div>
+            
+            <button id="confirm-step-btn" 
+                    class="w-full bg-primary-accent hover:opacity-90 text-white font-bold py-3 rounded-lg transition duration-150 shadow-lg disabled:opacity-50"
+                    disabled>
+                Confirmar Etapa e Iniciar
+            </button>
+
+            <p id="step-selection-message" class="text-center text-sm text-secondary-text">
+                Selecione uma etapa para prosseguir.
+            </p>
+        </div>
+
+
+        <!-- 2. TELA PRINCIPAL DE PRODUÇÃO (Inicialmente Oculta) -->
+        <div id="main-production-screen" class="hidden space-y-6">
+
+            <!-- Indicador de Etapa Atual -->
+            <div class="bg-input-bg p-3 rounded-lg border border-primary-accent text-center shadow-md">
+                <span class="text-xs font-medium text-secondary-text">Etapa Selecionada:</span>
+                <p id="current-etapa-display" class="text-xl font-bold text-primary-accent truncate">--</p>
+            </div>
+            
+            <!-- Cronômetro e Controles -->
+            <div id="timer-section" class="bg-dark-card p-4 rounded-lg shadow-inner border border-dark-border">
+                <div class="flex flex-col items-center space-y-3">
+                    <span id="timer-display" class="text-6xl font-mono font-bold text-light-text">00:00:00</span>
+                    <span id="timer-status" class="text-sm font-semibold text-secondary-text">PRONTO. Selecione START.</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2 mt-4">
+                    <button id="start-btn" 
+                            class="col-span-1 btn-green hover:opacity-90 text-white font-bold py-2 px-3 rounded-lg transition duration-150 shadow-md disabled:opacity-50"
+                            disabled>
+                        START
+                    </button>
+                    <!-- <button id="pause-btn" 
+                            class="col-span-1 btn-yellow hover:opacity-90 text-white font-bold py-2 px-3 rounded-lg transition duration-150 shadow-md disabled:opacity-50"
+                            disabled>
+                        PAUSAR
+                    </button> -->
+                    <button id="finish-btn" 
+                            class="col-span-1 btn-red hover:opacity-90 text-white font-bold py-2 px-3 rounded-lg transition duration-150 shadow-md disabled:opacity-50"
+                            disabled>
+                        FINALIZAR
+                    </button>
+                </div>
+            </div>
+
+            <!-- Campo de Bip e Status -->
+            <div id="bip-section" class="space-y-4">
+                <h2 class="text-xl font-bold text-light-text">Leitor de Códigos (Bip)</h2>
+                <input type="text" id="codigo-input" placeholder="Bipe o código..." autofocus
+                    class="w-full text-2xl text-center p-3 border-4 border-dark-border rounded-lg focus-accent focus:outline-none transition duration-150 shadow-inner bg-input-bg placeholder-gray-500 text-black">
+
+                <button id="bipar-btn" 
+                        class="w-full bg-primary-accent hover:opacity-90 text-white font-bold py-3 rounded-lg transition duration-150 shadow-lg disabled:opacity-50"
+                        onclick="handleBip()"
+                        disabled>
+                    BIPAR / ENVIAR CÓDIGO (Enter)
+                </button>
+                
+                <p id="status-message" class="text-sm text-center min-h-[1.5em] font-medium"></p>
+            </div>
+
+            <!-- Log de Dados Recentes (Para Feedback) -->
+            <div class="pt-4 border-t border-dark-border">
+                <h2 class="text-lg font-bold text-light-text mb-2">Log de Comunicação (Servidor)</h2>
+                <ul id="log-list" class="space-y-1 text-sm bg-input-bg p-3 rounded-lg max-h-40 overflow-y-auto border border-dark-border">
+                    <li class="text-secondary-text italic">Nenhum evento enviado ainda.</li>
+                </ul>
+            </div>
+            
+            <button id="change-step-btn" 
+                    class="w-full text-secondary-text text-sm hover:text-light-text mt-4 transition duration-150"
+                    onclick="changeStep()">
+                ← Voltar para Seleção de Etapa
+            </button>
+
+        </div>
+        
+    </div>
+
+    <!-- Script principal -->
+    <script type="module">
+        // Identificador fixo para o terminal
+        const TERMINAL_IDENTIFIER = "{{ session.username }}";
+        
+        // Mapeamento de Etapas (Display Name -> Key for Payload)
+        const ETAPAS = [
+            { name: "Abertura de Caixa", key: "ABERTURA_CAIXA" },
+            { name: "Upgrade", key: "UPGRADE" },
+            { name: "Instalação de Imagem", key: "INSTALACAO_IMAGEM" },
+            { name: "Finalização", key: "FINALIZACAO_PROD" }
+        ];
+
+        // --- Variáveis de Estado do Aplicativo (Memória Local) ---
+        let logListArray = [];
+        let startTime = null;
+        let elapsedTime = 0;
+        let timerInterval = null;
+        let timerState = 'STOPPED'; // STOPPED, RUNNING, PAUSED
+        let selectedEtapa = null; // Armazena a etapa selecionada
+
+        // --- Referências de Elementos ---
+        // Telas
+        const stepSelectionScreen = document.getElementById('step-selection-screen');
+        const mainProductionScreen = document.getElementById('main-production-screen');
+        const etapaButtonsContainer = document.getElementById('etapa-buttons');
+        const confirmStepBtn = document.getElementById('confirm-step-btn');
+        const currentEtapaDisplay = document.getElementById('current-etapa-display');
+        const stepSelectionMessage = document.getElementById('step-selection-message');
+
+        // Main App Controls
+        const display = document.getElementById('timer-display');
+        const statusMsg = document.getElementById('timer-status');
+        const startBtn = document.getElementById('start-btn');
+        // const pauseBtn = document.getElementById('pause-btn');
+        const finishBtn = document.getElementById('finish-btn');
+        const bipInput = document.getElementById('codigo-input');
+        const bipBtn = document.getElementById('bipar-btn');
+        const statusMessage = document.getElementById('status-message');
+        const logList = document.getElementById('log-list');
+        const userDisplay = document.getElementById('user-display');
+
+        // URL do servidor Flask.
+        const SERVER_URL = '/atividade';
+
+        // --- FUNÇÕES DE UTILIDADE DE TELA ---
+
+        function showScreen(screenId) {
+            stepSelectionScreen.classList.add('hidden');
+            mainProductionScreen.classList.add('hidden');
+
+            if (screenId === 'selection') {
+                stepSelectionScreen.classList.remove('hidden');
+            } else if (screenId === 'main') {
+                mainProductionScreen.classList.remove('hidden');
+            }
+            // Garante que o foco esteja no input correto
+            if (screenId === 'main') {
+                bipInput.focus();
+            } else {
+                bipInput.blur();
+            }
+        }
+
+        function selectEtapa(etapaObject) {
+            selectedEtapa = etapaObject;
+            
+            // Atualiza o feedback visual na tela de seleção
+            Array.from(etapaButtonsContainer.children).forEach(btn => {
+                btn.classList.remove('selected');
+                btn.style.backgroundColor = 'var(--input-bg)'; // Reset background color
+                btn.style.color = 'var(--light-text)';         // Reset text color
+            });
+            const targetButton = document.getElementById(`btn-${etapaObject.key}`);
+            if (targetButton) {
+                targetButton.classList.add('selected');
+                targetButton.style.backgroundColor = 'var(--primary-accent)';
+                targetButton.style.color = 'black'; 
+            }
+
+            confirmStepBtn.disabled = false;
+            stepSelectionMessage.textContent = `Etapa: ${selectedEtapa.name} selecionada.`;
+            stepSelectionMessage.classList.add('text-primary-accent');
+        }
+
+        window.changeStep = function() {
+             // Se o timer estiver rodando, força finalização antes de mudar de etapa
+            if (timerState !== 'STOPPED') {
+                finishTimer(false); // Não envia status, apenas reseta localmente
+            }
+            selectedEtapa = null;
+            updateButtons();
+            updateDisplay();
+            showScreen('selection');
+            stepSelectionMessage.textContent = 'Selecione uma nova etapa.';
+        }
+
+        function confirmStep() {
+            if (!selectedEtapa) return;
+
+            // Define o display da etapa na tela principal
+            currentEtapaDisplay.textContent = selectedEtapa.name;
+
+            // Atualiza o status inicial e navega para a tela principal
+            updateStatusMessage(`Etapa ${selectedEtapa.name} iniciada. Pressione START para começar a produção.`, false, true);
+            showScreen('main');
+
+            updateButtons();
+        }
+
+        function renderEtapaButtons() {
+            etapaButtonsContainer.innerHTML = '';
+            ETAPAS.forEach(etapa => {
+                const button = document.createElement('button');
+                button.id = `btn-${etapa.key}`;
+                button.textContent = etapa.name;
+                button.className = 'btn-etapa font-semibold py-4 rounded-lg shadow-md';
+                button.onclick = () => selectEtapa(etapa);
+                etapaButtonsContainer.appendChild(button);
+            });
+        }
+        
+        // --- FUNÇÕES DE UTILIDADE GERAIS (INALTERADAS) ---
+
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function getCurrentTimeMs() {
+             return timerState === 'RUNNING' 
+                 ? elapsedTime + (Date.now() - startTime)
+                 : elapsedTime;
+        }
+        
+        function logEvent(type, action, details) {
+            console.log(`[LOG - ${type}] ${action}: ${details}`);
+        }
+
+        function updateStatusMessage(text, isError = false, isSuccess = false) {
+            statusMessage.textContent = text;
+            let classes = "text-sm text-center min-h-[1.5em] font-bold";
+            if (isError) {
+                classes += " text-red-400";
+            } else if (isSuccess) {
+                classes += " text-green-400";
+            } else {
+                classes += " text-primary-accent";
+            }
+            statusMessage.className = classes;
+        }
+
+        // --- COMUNICAÇÃO COM O SERVIDOR (INALTERADA EXCETO PELO CAMPO ETAPA) ---
+        
+        async function sendDataToServer(data) {
+            const maxRetries = 3;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(SERVER_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        return { success: true, message: result.mensagem };
+                    } else {
+                        const errorMsg = result.mensagem || "Erro desconhecido do servidor.";
+                        updateStatusMessage(`ERRO DE ENVIO: ${errorMsg}`, true);
+                        return { success: false, message: errorMsg };
+                    }
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        const errorMessage = `ERRO DE CONEXÃO: Servidor Flask indisponível em ${SERVER_URL} após ${maxRetries} tentativas.`;
+                        updateStatusMessage(errorMessage, true);
+                        console.error(errorMessage, error);
+                        return { success: false, message: errorMessage };
+                    }
+                    const delay = Math.pow(2, i) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        function updateLogListUI(type, code, status, message, timeFormatted) {
+            logListArray.push({
+                type: type,
+                time: timeFormatted, 
+                code: code, 
+                status: status, 
+                message: message
+            });
+
+            const recentLogs = logListArray.slice(-5).reverse(); 
+            logList.innerHTML = '';
+            
+            if (recentLogs.length === 0) {
+                logList.innerHTML = '<li class="text-secondary-text italic">Nenhum evento enviado ainda.</li>';
+                return;
+            }
+
+            recentLogs.forEach((data) => {
+                const statusColor = data.status === 'OK' ? 'text-green-400' : 'text-red-400';
+                const typeText = data.type === 'BIP' ? 'BIP' : 'STATUS';
+                const codeText = data.code && data.code !== 'N/A' ? `[${data.code}]` : '';
+
+                const li = document.createElement('li');
+                li.className = 'border-b border-gray-600 last:border-b-0 py-1 flex justify-between items-start';
+                
+                li.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="font-mono text-light-text font-semibold">${typeText} ${codeText}</span>
+                        <span class="text-xs text-secondary-text">${data.message}</span>
+                    </div>
+                    <span class="text-xs ${statusColor} ml-2 text-right">${data.time}</span>
+                `;
+                logList.appendChild(li);
+            });
+        }
+
+        async function sendStatusUpdate(newStatus) {
+            
+            const timeMs = getCurrentTimeMs();
+            const timeFormatted = formatTime(timeMs);
+            const tempoTotalSegundos = Math.round(timeMs / 1000);
+            const username = "{{ session.username }}"; 
+
+            // NOVO: Usa a chave da etapa selecionada
+            const etapaKey = selectedEtapa ? selectedEtapa.key : "N/A_SELECAO"; 
+
+            const data = {
+                usuario: username,
+                status: newStatus,
+                serial: "N/A", 
+                etapa: etapaKey, // Usa a etapa selecionada
+                tempo_total_segundos: tempoTotalSegundos
+            };
+
+            const result = await sendDataToServer(data);
+            updateLogListUI('STATUS', data.status, result.success ? 'OK' : 'FALHA', `Status: ${newStatus} (${etapaKey})`, timeFormatted);
+        }
+
+        // --- FUNÇÕES DO CRONÔMETRO ---
+        
+        function updateDisplay() {
+            display.textContent = formatTime(getCurrentTimeMs());
+        }
+        
+        function startTimer() {
+            if (timerState === 'RUNNING' || !selectedEtapa) return;
+            
+            startTime = Date.now();
+            timerState = 'RUNNING';
+            statusMsg.textContent = 'Cronômetro EM EXECUÇÃO...';
+            
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateDisplay, 1000);
+            
+            updateButtons();
+            logEvent("CRONÔMETRO", "INICIADO", `Etapa: ${selectedEtapa.name}`);
+            sendStatusUpdate("EM_ANDAMENTO");
+        }
+        
+        function pauseTimer() {
+            if (timerState !== 'RUNNING') return;
+            
+            elapsedTime += Date.now() - startTime;
+            clearInterval(timerInterval);
+            
+            timerState = 'PAUSED';
+            statusMsg.textContent = 'Cronômetro PAUSADO. Pressione START para continuar.';
+            
+            updateButtons();
+            logEvent("CRONÔMETRO", "PAUSADO", `Tempo total: ${formatTime(elapsedTime)}`);
+            updateStatusMessage("Cronômetro pausado. Bip bloqueado.", false, false);
+            sendStatusUpdate("PAUSADO");
+        }
+        
+        function finishTimer(sendUpdate = true) {
+            if (timerState === 'STOPPED') return;
+            
+            if (timerState === 'RUNNING') {
+                elapsedTime += Date.now() - startTime; 
+            }
+            clearInterval(timerInterval);
+            
+            const finalTime = elapsedTime;
+            
+            if (sendUpdate) {
+                // Envia o status FINALIZADO se não estiver apenas limpando o estado
+                sendStatusUpdate("FINALIZADO"); 
+            }
+
+            // Reseta o estado para um novo ciclo
+            startTime = null;
+            elapsedTime = 0;
+            timerState = 'STOPPED';
+            
+            statusMsg.textContent = 'Atividade FINALIZADA. Pressione START para iniciar um novo ciclo.';
+            display.textContent = formatTime(finalTime);
+            
+            updateButtons();
+            logEvent("CRONÔMETRO", "FINALIZADO", `Tempo Final: ${formatTime(finalTime)}`);
+            if (sendUpdate) {
+                 updateStatusMessage("Atividade finalizada. Bip bloqueado. Inicie um novo ciclo.", false, false);
+            } else {
+                 updateStatusMessage("Cronômetro resetado.", false, false);
+            }
+        }
+        
+        function updateButtons() {
+            // Os controles do timer só são ativados se houver uma etapa selecionada
+            const isEtapaSelected = selectedEtapa !== null;
+
+            const startDisabled = timerState === 'RUNNING' || !isEtapaSelected;
+            
+            startBtn.disabled = startDisabled;
+            // pauseBtn.disabled = timerState !== 'RUNNING';
+            finishBtn.disabled = timerState === 'STOPPED';
+            
+            // O bip é desabilitado se o timer não estiver RUNNING
+            const bipDisabled = timerState !== 'RUNNING';
+            bipBtn.disabled = bipDisabled;
+            // O input pode receber o foco, mas o botão de bip será desativado se o timer não estiver rodando
+            bipInput.disabled = false; 
+
+            // Atualiza a aparência do input
+            bipInput.classList.toggle('opacity-50', bipDisabled);
+
+            if (timerState === 'STOPPED' && isEtapaSelected) {
+                 statusMsg.textContent = 'PRONTO. Pressione START para iniciar a atividade.';
+            } else if (!isEtapaSelected) {
+                 statusMsg.textContent = 'Selecione uma etapa para começar.';
+            } 
+        }
+        
+
+        // --- MANIPULADOR DE BIPS ---
+        
+        window.handleBip = async function() {
+            const codigo = bipInput.value.trim();
+            bipInput.value = ''; 
+            
+            if (!codigo) {
+                updateStatusMessage("ERRO: O campo de código não pode estar vazio.", true);
+                bipInput.focus();
+                return;
+            }
+            
+            if (timerState !== 'RUNNING') {
+                const errorState = timerState === 'PAUSED' ? 'PAUSADO' : 'FINALIZADO';
+                updateStatusMessage(`ERRO: Não é permitido bipar com o cronômetro ${errorState}.`, true);
+                bipInput.focus();
+                return;
+            }
+            
+            const timeAtBip = getCurrentTimeMs();
+            const timeFormatted = formatTime(timeAtBip);
+            const tempoTotalSegundos = Math.round(timeAtBip / 1000);
+            const username = TERMINAL_IDENTIFIER;
+
+            // NOVO: Usa a chave da etapa selecionada
+            const etapaKey = selectedEtapa.key; 
+
+            const bipData = {
+                usuario: username,
+                status: "BIP_SERIAL",
+                serial: codigo,
+                etapa: etapaKey, // Usa a etapa selecionada
+                tempo_total_segundos: tempoTotalSegundos
+            };
+
+            const result = await sendDataToServer(bipData);
+            
+            updateLogListUI('BIP', codigo, result.success ? 'OK' : 'FALHA', result.message, timeFormatted);
+            updateStatusMessage(`Código ${codigo} enviado.`, false, result.success);
+
+            logEvent("BIP", "CÓDIGO ENVIADO", `Código: ${codigo} @ ${timeFormatted}`);
+            
+            bipInput.focus(); 
+        }
+        
+        // --- CONFIGURAÇÃO E INICIALIZAÇÃO ---
+        
+        function setupEventListeners() {
+            startBtn.onclick = startTimer;
+            // pauseBtn.onclick = pauseTimer;
+            finishBtn.onclick = () => finishTimer(true); // Garante que a função receba o parâmetro correto
+            
+            confirmStepBtn.onclick = confirmStep;
+
+            bipInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); 
+                    window.handleBip();
+                }
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            userDisplay.textContent = TERMINAL_IDENTIFIER;
+            renderEtapaButtons();
+            setupEventListeners();
+            updateButtons(); 
+            updateLogListUI(); 
+            showScreen('selection'); // Inicia na tela de seleção de etapa
+        });
+    </script>
+</body>
+</html>

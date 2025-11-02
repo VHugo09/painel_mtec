@@ -10,6 +10,8 @@ import pytz
 from werkzeug.security import generate_password_hash, check_password_hash
 import traceback
 import json
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Definir fuso horário de Brasília
 fuso_brasilia = pytz.timezone("America/Sao_Paulo")
@@ -80,6 +82,14 @@ class HistoricoStatusTb(Base):
     status_alterado = Column(Integer)
     data_mudanca = Column(DateTime(timezone=True), default=lambda: datetime.now(fuso_brasilia))
     alterado_por = Column(String)
+
+class AtividadesTb(Base):
+    __tablename__ = 'atividades_tb'
+    id = Column(Integer, primary_key=True)
+    usuario = Column(String)
+    etapa = Column(String)
+    status = Column(String)
+    data_hora_criacao = Column(DateTime(timezone=True), default=lambda: datetime.now(fuso_brasilia))
 
 # --- FUNÇÃO PARA POPULAR DADOS INICIAIS ---
 def popular_dados_iniciais(db_session):
@@ -153,15 +163,18 @@ def home(): return render_template("index.html")
 def painel_tv_page(): return render_template("painel_tv.html")
 
 @app.route("/api/painel-tv-dados")
-@login_required
 def painel_tv_api(): return jsonify(get_painel_data())
 
+@app.route("/biapdor")
+@login_required
+def bipador_page(): return render_template("bipador.html")
+
+# --- ROTAS DA API PARA USUÁRIOS (CRUD COMPLETO) ---
 @app.route("/usuarios")
 @login_required
 @admin_required
 def usuarios_page(): return render_template("usuarios.html")
 
-# --- ROTAS DA API PARA USUÁRIOS (CRUD COMPLETO) ---
 @app.route("/api/usuarios", methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -354,27 +367,26 @@ def reordenar_prioridade():
 # --- OUTRAS ROTAS DA API ---
 @app.route('/atividade', methods=['POST'])
 def receber_atividade():
-    """Função que processa as requisições POST do aplicativo Kivy."""
-    
     # Verifica se a requisição contém dados JSON
     if not request.is_json:
         return jsonify({"mensagem": "Requisição não contém JSON válido"}), 400
 
     # Acessa os dados JSON enviados pelo Kivy
     dados_recebidos = request.get_json()
+    agora = datetime.now(pytz.timezone("America/Sao_Paulo")).replace(tzinfo=None)
 
     # --- Acesso aos dados ---
     # Aqui é onde você acessa os valores enviados. 
     # Por exemplo, se quiser o nome do usuário ou o serial bipado:
     
-    usuario = dados_recebidos.get('usuario', 'N/A')
-    status = dados_recebidos.get('status', 'N/A')
-    serial = dados_recebidos.get('serial', 'N/A')
-    etapa = dados_recebidos.get('etapa', 'N/A')
+    usuario = str(dados_recebidos.get('usuario', 'N/A'))
+    status = str(dados_recebidos.get('status', 'N/A'))
+    serial = str(dados_recebidos.get('serial', 'N/A'))
+    etapa = str(dados_recebidos.get('etapa', 'N/A'))
     tempo_total = dados_recebidos.get('tempo_total_segundos','N/A')
     
     # Imprime os dados recebidos no console do servidor para debug
-    print("--- DADOS RECEBIDOS DO KIVY ---")
+    print("--- DADOS RECEBIDOS ---")
     print(f"Status do Evento: {status}")
     print(f"Usuário: {usuario}")
     print(f"Serial: {serial}")
@@ -383,27 +395,76 @@ def receber_atividade():
     print(f"Payload Completo: {json.dumps(dados_recebidos, indent=4)}")
     print("--------------------------------")
 
-    global atividades_atuais
+    with engine.connect() as conn:
 
-    if 'atividades_atuais' not in globals():
-        atividades_atuais = {}
+        ultimo = conn.execute (text("""
+            SELECT id, status
+            FROM atividades_tb
+            WHERE usuario = :usuario
+            ORDER BY data_hora_fim DESC
+            LIMIT 1
+        """), {"usuario": dados_recebidos["usuario"]}).fetchone()
 
-    atividades_atuais[usuario] = {
-        "usuario": usuario,
-        "status": status,
-        "etapa": etapa,
-        "serial": serial,
-        "tempo_total": tempo_total
-    }
-    
-    # Responde ao Kivy com sucesso (código 200) e uma mensagem
-    # O Kivy espera esse código 200 para saber que o envio foi OK.
-    return jsonify({
-        "sucesso": True, 
-        "mensagem": f"Dados de {status} recebidos com sucesso."
-    })
+        if ultimo and ultimo.status != "FINALIZADO":
+            
+            if dados_recebidos["status"] == "FINALIZADO":
+                conn.execute(text("""
+                    UPDATE atividades_tb
+                    SET etapa = :etapa,
+                        status = :status,
+                        data_hora_fim = :data_hora_fim
+                    WHERE id = :id
+                """), {
+                    "etapa": dados_recebidos["etapa"],
+                    "status": dados_recebidos["status"],
+                    "data_hora_fim": agora,
+                    "id": ultimo.id
+                })
+            else:
+                conn.execute(text("""
+                    UPDATE atividades_tb
+                    SET etapa = :etapa,
+                        status = :status
+                    WHERE id = :id
+                    """), {
+                        "etapa": dados_recebidos["etapa"],
+                        "status": dados_recebidos["status"],
+                        "id": ultimo.id
+                    })
+        else:
+
+            conn.execute(text("""
+                INSERT INTO atividades_tb (usuario, etapa, status, data_hora_criacao)
+                VALUES (:usuario, :etapa, :status, :data_m)
+            
+            """), {
+                "usuario": dados_recebidos["usuario"],
+                "etapa": dados_recebidos["etapa"],
+                "status": dados_recebidos["status"],
+                "data_m": agora
+            })
+
+        # Insere registro na tabela de seriais bipados
+        if dados_recebidos["status"] == "BIP_SERIAL":
+            conn.execute(text("""
+                INSERT INTO seriais_bipados_tb (serial, atividade_id, usuario_id)
+                SELECT :serial, :atividade_id, u.id
+                FROM atividades_tb a
+                INNER JOIN usuario_tb u ON u.username = :usuario
+                WHERE a.id = :atividade_id
+            
+            """), {
+                "serial": dados_recebidos["serial"],
+                "atividade_id": ultimo.id,
+                "usuario": dados_recebidos["usuario"]
+            })
+
+        conn.commit()
+
+    return jsonify({"mensagem": "Atividade registrada ou atualizada com sucesso"})
 
 @app.route('/api/atividades', methods=['GET'])
+@login_required
 def listar_atividades():
     """Retorna as atividades atuais dos usuários."""
     global atividades_atuais

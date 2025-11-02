@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="120">
     <title>Painel de Produção MTEC</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome para ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
@@ -29,7 +31,7 @@
             font-family: 'Poppins', sans-serif;
             margin: 0;
             padding: 20px;
-            overflow: hidden;
+            overflow: hidden; /* Garante que o scroll só ocorra onde desejado */
         }
         .grid-container {
             display: grid;
@@ -51,11 +53,14 @@
             padding-bottom: 8px;
             margin: 0;
         }
+        /* Layout Grid */
         #col-prioridades { grid-column: 1 / 2; grid-row: 1 / 2; }
         #col-listas-1 { grid-column: 2 / 3; grid-row: 1 / 2; }
         #col-listas-2 { grid-column: 3 / 4; grid-row: 1 / 2; }
         #col-concluidos { grid-column: 4 / 5; grid-row: 1 / 2; }
         #col-dashboard { grid-column: 1 / 5; grid-row: 2 / 3; border-top: 1px solid var(--border-color); padding-top: 15px; }
+        
+        /* Cartões e Listas */
         .priority-card {
             background-color: var(--card-bg);
             border: 1px solid var(--primary-orange);
@@ -68,7 +73,7 @@
         .priority-card h3 { margin: 0; font-size: 1.1rem; }
         .priority-card p { margin: 5px 0; color: var(--text-secondary); font-size: 0.9rem; }
         .card-footer { display: flex; justify-content: space-between; align-items: center; }
-        .card-footer-info { display: flex; align-items: center; gap: 8px; } /* Reduzido o gap geral */
+        .card-footer-info { display: flex; align-items: center; gap: 8px; }
         .card-footer .maquinas { font-size: 1.8rem; font-weight: 700; }
         .list-item { font-size: 0.95rem; }
         .list-item .maquinas { color: var(--primary-orange); font-weight: 600; }
@@ -77,75 +82,90 @@
         .side-column-section { display: flex; flex-direction: column; gap: 10px; }
         .totals-box { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 0.9rem; }
         .dashboard-grid { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 20px; }
+        
+        /* Métricas */
         .metric-box h4 { font-size: 1.1rem; color: var(--text-light); }
         .metric-box .value { font-size: 3rem; font-weight: 700; color: var(--primary-orange); line-height: 1; }
         .metric-box .sub-value { font-size: 1rem; color: var(--text-secondary); }
+        
+        /* Progresso Semanal */
         .progress-bar-container { display: flex; flex-direction: column; gap: 5px; }
         .progress-bar-label { font-size: 0.9rem; }
         .progress-bar { background-color: var(--card-bg); border-radius: 5px; height: 20px; overflow: hidden; }
         .progress-bar-fill { background-color: var(--primary-orange); height: 100%; width: 0%; transition: width 0.5s ease-in-out; }
         .progress-bar-container.current-week .progress-bar-fill { background-color: #FFAA33; }
         
-        .office-indicator {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            color: var(--office-color);
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-        .office-indicator .fa-windows {
-            font-size: 1.1rem;
-        }
-
-        .os-icon-container {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            margin-right: 5px;
-        }
-        .os-icon {
-            font-size: 1.1rem;
-        }
-        .etq-icon {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            align-self: flex-start;
-        }
+        /* Indicadores de SO/Office */
+        .office-indicator { display: flex; align-items: center; gap: 5px; color: var(--office-color); font-weight: 600; font-size: 0.9rem; }
+        .office-indicator .fa-windows { font-size: 1.1rem; }
+        .os-icon-container { display: inline-flex; align-items: center; gap: 5px; margin-right: 5px; }
+        .os-icon { font-size: 1.1rem; }
+        .etq-icon { font-size: 0.7rem; color: var(--text-secondary); align-self: flex-start; }
         .windows-icon { color: var(--windows-color); }
         .linux-icon { color: var(--linux-color); }
         .slui-icon { color: var(--slui-color); }
         .freedos-icon { color: var(--freedos-color); }
+        .info-separator { color: var(--text-light); font-weight: 600; }
 
-        .info-separator {
+        /* --- ESTILOS DA TABELA DE ATIVIDADES EM TEMPO REAL (NOVO) --- */
+        .table-scroll-container {
+            max-height: 250px; /* Limita a altura para caber no dashboard */
+            overflow-y: auto; /* Adiciona scroll vertical se necessário */
+            width: 100%;
+            margin-top: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--card-bg);
+        }
+        
+        #tabela-atividades-principal {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
             color: var(--text-light);
-            font-weight: 600;
         }
 
-        #tabela-atividades {
-        width: 100%;
-        table-layout: fixed; /* ajuda a distribuir melhor o espaço */
+        #tabela-atividades-principal thead th {
+            position: sticky; /* Mantém o cabeçalho visível durante a rolagem */
+            top: 0;
+            background-color: var(--primary-orange); 
+            color: var(--bg-color); /* Texto escuro no cabeçalho laranja */
+            font-weight: 700;
+            padding: 8px 5px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
         }
 
-        /* Deixa as colunas com bordas suaves e visual limpo */
-        #tabela-atividades th,
-        #tabela-atividades td {
-        padding: 5px;
-        text-align: center; /* <-- centraliza o texto horizontalmente */
-        vertical-align: middle; /* <-- centraliza o texto verticalmente */
+        #atividades-tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
+            font-size: 0.75rem; /* Fonte menor para caber mais dados */
+        }
+        #atividades-tbody tr:hover {
+            background-color: #383838;
+        }
+        
+        #atividades-tbody td {
+            padding: 6px 5px;
+            text-align: center;
+            vertical-align: middle;
+            white-space: nowrap; 
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        /* Cabeçalho mais destacado */
-        #tabela-atividades thead th {
-        background-color: #007BFF;
-        color: white;
-        font-weight: bold;
+        /* Classes de status */
+        .status-running { color: var(--color-success); font-weight: 600; }
+        .status-paused { color: var(--primary-orange); font-weight: 600; }
+        .status-ended { color: var(--text-secondary); }
+
+        /* Animação de destaque (nova linha) */
+        @keyframes destaque {
+            0% { background-color: rgba(255, 102, 0, 0.4); }
+            100% { background-color: transparent; }
         }
-
-
-        /* Quando houver atualização, pisca levemente */
         .nova-linha {
-        animation: destaque 1s ease;
+            animation: destaque 1s ease;
         }
     </style>
 </head>
@@ -188,7 +208,8 @@
             </div>
         </div>
         <div id="col-dashboard" class="grid-item">
-             <div class="dashboard-grid">
+            <div class="dashboard-grid">
+                <!-- COLUNA 1: Métricas -->
                 <div class="metric-box">
                     <h4>Total Concluído no Mês</h4>
                     <p class="value" id="metric-total-mes">0</p>
@@ -197,23 +218,36 @@
                     <p class="value" id="metric-media-dia">0.0</p>
                     <p class="sub-value" id="metric-media-dia-maq">0.0 máq.</p>
                 </div>
+                <!-- COLUNA 2: Desempenho e Atividades em Andamento (Tabela NOVA) -->
                 <div class="metric-box">
                     <h4 id="desempenho-title">Desempenho Semanal (Meta: 200 máq.)</h4>
                     <div id="desempenho-container" class="progress-bar-container"></div>
-                    <h4>Atividades</h4>
-                        <table>
+                    
+                    <h4 style="margin-top: 15px;">Atividades em Andamento</h4>
+                    <div class="table-scroll-container">
+                        <table id="tabela-atividades-principal">
+                            <!-- Definindo larguras das colunas para "table-layout: fixed" -->
+                            <colgroup>
+                                <col style="width: 20%;">
+                                <col style="width: 20%;">
+                                <col style="width: 25%;">
+                                <col style="width: 15%;">
+                                <col style="width: 20%;">
+                            </colgroup>
                             <thead>
                                 <tr>
-                                <th>Funcionário</th>
-                                <th>Etapa</th>
-                                <th>Ultimo Serial Bipado</th>
-                                <th>Status</th>
-                                <th>Tempo</th>
+                                    <th>Funcionário</th>
+                                    <th>Etapa</th>
+                                    <th>Ultimo Serial Bipado</th>
+                                    <th>Status</th>
+                                    <th>Tempo</th>
                                 </tr>
                             </thead>
-                            <tbody id="tabela-atividades"></tbody>
+                            <tbody id="atividades-tbody"></tbody>
                         </table>
                     </div>
+                </div>
+                <!-- COLUNA 3: Recorde -->
                 <div class="metric-box">
                     <h4>Recorde Diário no Mês</h4>
                     <p class="value" id="metric-recorde-pedidos">0</p>
@@ -254,7 +288,6 @@
             if (Array.isArray(prioridades) && prioridades.length > 0) {
                 prioridades.forEach(p => {
                     const prioridadeTexto = p.prioridade ? `(${p.prioridade}ª Prioridade)` : '';
-                    // ===== LÓGICA ATUALIZADA PARA ADICIONAR O TRAÇO =====
                     const officeIndicator = p.tem_office ? `<span class="info-separator">-</span><span class="office-indicator" title="Inclui Office"><i class="fa-brands fa-windows"></i> Office</span>` : '';
                     const osIcon = getOsIcon(p.nome_imagem);
                     const urgentIcon = p.urgente ? `<i class="fa-solid fa-fire" style="color: var(--color-danger);" title="Urgente"></i>` : '';
@@ -283,7 +316,6 @@
             }
         }
 
-        // As outras funções JavaScript não precisam de alteração
         function renderSimpleList(data, listId, moreId) {
             const listContainer = document.getElementById(listId);
             const moreContainer = document.getElementById(moreId);
@@ -339,9 +371,11 @@
                 const hoje = new Date();
                 const diaDaSemana = hoje.getDay();
                 const diff = hoje.getDate() - diaDaSemana + (diaDaSemana === 0 ? -6 : 1);
+                // Converte para o início da semana atual (segunda-feira) no formato YYYY-MM-DD
                 const inicioSemanaAtual = new Date(hoje.setDate(diff)).toISOString().split('T')[0];
 
                 desempenho.forEach(semana => {
+                    // Assegura que o fuso horário seja tratado para cálculo correto da data
                     const semanaObj = new Date(semana.semana + 'T12:00:00Z');
                     if (isNaN(semanaObj.getTime())) return; 
 
@@ -372,97 +406,43 @@
                 });
             }
         }
-        // FUNÇÕES DE ATIVIDADES E TEMPO
+        
+        // --- FUNÇÃO PARA RENDERIZAR A TABELA DE ATIVIDADES (NOVA) ---
+        function renderAtividades(atividades) {
+            const tbody = document.getElementById('atividades-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = ''; // Limpa a tabela antes de preencher
 
-        const timers = new Map(); // Guarda todos os timers por funcionário
-
-        // Função para formatar segundos em hh:mm:ss
-        function formatTime(seconds) {
-        const h = String(Math.floor(seconds / 3600)).padStart(2, "0");
-        const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
-        const s = String(seconds % 60).padStart(2, "0");
-        return `${h}:${m}:${s}`;
-        }
-
-        // Função que inicia ou atualiza um timer
-        function iniciarOuAtualizarTimer(funcionario, td, status) {
-        // Se ainda não existir, cria o registro do timer
-        if (!timers.has(funcionario)) {
-            timers.set(funcionario, {
-            count: 0,
-            interval: null
-            });
-        }
-
-        const timer = timers.get(funcionario);
-
-        // Se o status for "Pausado" ou "Finalizado", para o contador
-        if (status.toLowerCase() === "pausado" || status.toLowerCase() === "finalizado") {
-            if (timer.interval) {
-            clearInterval(timer.interval);
-            timer.interval = null;
-            }
-        } else {
-            // Se o timer não está rodando, inicia
-            if (!timer.interval) {
-            timer.interval = setInterval(() => {
-                timer.count++;
-                td.textContent = formatTime(timer.count);
-            }, 1000);
+            if (Array.isArray(atividades) && atividades.length > 0) {
+                atividades.forEach(ativ => {
+                    const status = ativ.status.toUpperCase();
+                    let statusClass = 'status-ended';
+                    let statusText = 'FIM JORNADA';
+                    
+                    if (status === 'EM_ANDAMENTO') {
+                        statusClass = 'status-running';
+                        statusText = 'Em Andamento';
+                    } else if (status === 'PAUSADO') {
+                        statusClass = 'status-paused';
+                        statusText = 'Pausado';
+                    }
+                    
+                    // Adiciona a classe 'nova-linha' para um efeito visual de atualização
+                    const row = tbody.insertRow();
+                    row.classList.add('nova-linha');
+                    
+                    row.innerHTML = `
+                        <td>${ativ.funcionario || 'N/A'}</td>
+                        <td>${ativ.etapa || 'N/A'}</td>
+                        <td>${ativ.ultimo_serial || 'N/A'}</td>
+                        <td><span class="${statusClass}">${statusText}</span></td>
+                        <td>${ativ.tempo_formatado || '00:00:00'}</td>
+                    `;
+                });
+            } else {
+                 tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-secondary); padding: 15px;">Nenhuma atividade registrada no momento.</td></tr>';
             }
         }
-
-        // Atualiza o texto da célula para o valor atual
-        td.textContent = formatTime(timer.count);
-        }
-
-
-        async function carregarAtividades() {
-            try {
-                // Faz a requisição para sua API
-                const resposta = await fetch("/api/atividades");
-                const atividades = await resposta.json();
-
-                // Seleciona a tabela onde os dados serão exibidos
-                const tabela = document.getElementById("tabela-atividades");
-                tabela.innerHTML = ""; // limpa antes de adicionar novas linhas
-
-                // Percorre cada funcionário e suas informações
-                for (const [funcionario, info] of Object.entries(atividades)) {
-                const row = document.createElement("tr");
-
-                row.innerHTML = `
-                    <td>${funcionario}</td>
-                    <td>${info.etapa}</td>
-                    <td>${info.serial}</td>
-                    <td>${
-
-                        info.status === "pausado" ? "⏸ Pausado" :
-                        info.status === "finalizado" ? "✅ Finalizado" :
-                        "Em andamento"
-                        
-                        }</td>
-                    <td class="timer">00:00:00</td>
-                `;
-
-                tabela.appendChild(row);
-                // Pega a célula do timer
-                const tdTimer = row.querySelector(".timer");
-
-                // Inicia ou atualiza o timer conforme o status
-                iniciarOuAtualizarTimer(funcionario, tdTimer, info.status);
-                }
-
-            } catch (erro) {
-                console.error("Erro ao carregar atividades:", erro);
-            }
-            }
-
-            // Chama a função automaticamente a cada 5 segundos
-            setInterval(carregarAtividades, 5000);
-
-            // Chama uma vez ao abrir a página
-            carregarAtividades();
 
         async function atualizarPainel() {
             try {
@@ -473,15 +453,24 @@
                 const data = await response.json();
                 
                 if (data && !data.error) {
+                    // Renderiza os dados principais
                     renderPrioridades(data.prioridades);
                     renderSimpleList(data.backlog, 'backlog-list', 'backlog-more');
                     renderSimpleList(data.aguardando, 'aguardando-list', 'aguardando-more');
                     renderSimpleList(data.pendentes, 'pendentes-list', 'pendentes-more');
-                    renderSimpleList(data.em_montagem_fora_prioridade, 'montagem-fora-list', 'montagem-fora-more');
+                    // Assumindo que a lista 'em_montagem_fora_prioridade' não é usada neste layout
+                    
                     renderSideList(data.concluidos_hoje, 'concluidos-list', 'concluidos-total', 'concluido');
                     renderSideList(data.cancelados_hoje, 'cancelados-list', 'cancelados-total', 'cancelado');
+                    
+                    // Renderiza as métricas e desempenho
                     renderMetrics(data.metricas);
                     renderDesempenho(data.desempenho_semanal, data.meta_semanal);
+                    
+                    // --- CHAMA A NOVA FUNÇÃO DE ATIVIDADES ---
+                    // Assumindo que a chave de dados é 'atividades_em_andamento'
+                    renderAtividades(data.atividades_em_andamento); 
+
                 }
 
             } catch (error) {
@@ -492,7 +481,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             atualizarPainel();
-            setInterval(atualizarPainel, 10000);
+            // Atualiza a cada 10 segundos
+            setInterval(atualizarPainel, 10000); 
         });
     </script>
 </body>

@@ -169,9 +169,9 @@
         </div>
         
     </div>
-
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Script principal -->
-    <script type="module">
+    <script type="module" >
         // Identificador fixo para o terminal
         const TERMINAL_IDENTIFIER = "{{ session.username }}";
         
@@ -325,7 +325,7 @@
             statusMessage.className = classes;
         }
 
-        // --- COMUNICAÇÃO COM O SERVIDOR (INALTERADA EXCETO PELO CAMPO ETAPA) ---
+        // --- COMUNICAÇÃO COM O SERVIDOR  ---
         
         async function sendDataToServer(data) {
             const maxRetries = 3;
@@ -483,6 +483,17 @@
             } else {
                  updateStatusMessage("Cronômetro resetado.", false, false);
             }
+
+            selectedEtapa = null;            
+            currentEtapaDisplay.textContent = '--'; 
+            Swal.fire({
+                title: "✅ Atividade finalizada!",
+                text: `Tempo total: ${formatTime(finalTime)}`,
+                icon: "success",
+                confirmButtonText: "OK"
+            }).then(() => {
+            showScreen('selection');
+            });
         }
         
         function updateButtons() {
@@ -559,6 +570,61 @@
         
         // --- CONFIGURAÇÃO E INICIALIZAÇÃO ---
         
+        async function checarAtividadeExistente() {
+            const username = TERMINAL_IDENTIFIER;
+
+            try {
+                const resposta = await fetch(`/atividade_atual?usuario=${username}`);
+                const atividade = await resposta.json();
+
+                // Se não houver atividade ou estiver finalizada, mostrar seleção
+                if (!atividade.id || atividade.status === "FINALIZADO") {
+                    showScreen('selection');
+                    return;
+                }
+
+                // Existe atividade em andamento: atualiza a tela principal
+                selectedEtapa = { key: atividade.etapa, name: atividade.etapa }; 
+                currentEtapaDisplay.textContent = atividade.etapa;
+
+                showScreen('main');
+
+                // Calcula tempo decorrido baseado na data de criação
+                const inicio = new Date(atividade.data_hora_criacao);
+                const agora = new Date();
+
+                // Ajuste do fuso: pega o offset do local (em minutos) e converte para ms
+                const offsetMs = inicio.getTimezoneOffset() * 60 * 1000;
+
+                // Subtrai o offset para alinhar ao horário local
+                elapsedTime = agora - inicio - offsetMs;
+
+                startTime = Date.now();
+                timerState = 'RUNNING';
+
+                // Inicia timer
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(updateDisplay, 1000);
+
+                updateButtons();
+                updateStatusMessage(`Atividade em andamento recuperada: ${atividade.etapa}`, false, true);
+
+            } catch (erro) {
+                console.error("Erro ao checar atividade existente:", erro);
+                showScreen('selection');
+            }
+        }
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+            userDisplay.textContent = TERMINAL_IDENTIFIER;
+            renderEtapaButtons();
+            setupEventListeners();
+            updateButtons();
+            updateLogListUI();
+            checarAtividadeExistente(); // Recupera atividade existente antes de mostrar seleção
+        });
+
         function setupEventListeners() {
             startBtn.onclick = startTimer;
             // pauseBtn.onclick = pauseTimer;

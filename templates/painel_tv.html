@@ -136,16 +136,16 @@
             text-transform: uppercase;
         }
 
-        #atividades-tbody tr {
+        #tabela-atividades tr {
             border-bottom: 1px solid var(--border-color);
             transition: background-color 0.3s ease;
             font-size: 0.75rem; /* Fonte menor para caber mais dados */
         }
-        #atividades-tbody tr:hover {
+        #tabela-atividades tr:hover {
             background-color: #383838;
         }
         
-        #atividades-tbody td {
+        #tabela-atividades td {
             padding: 6px 5px;
             text-align: center;
             vertical-align: middle;
@@ -243,7 +243,9 @@
                                     <th>Tempo</th>
                                 </tr>
                             </thead>
-                            <tbody id="atividades-tbody"></tbody>
+                            <tbody id="tabela-atividades">
+                                <tr><td colspan="5">Carregando...</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -407,42 +409,147 @@
             }
         }
         
-        // --- FUNÇÃO PARA RENDERIZAR A TABELA DE ATIVIDADES (NOVA) ---
-        function renderAtividades(atividades) {
-            const tbody = document.getElementById('atividades-tbody');
-            if (!tbody) return;
-            tbody.innerHTML = ''; // Limpa a tabela antes de preencher
-
-            if (Array.isArray(atividades) && atividades.length > 0) {
-                atividades.forEach(ativ => {
-                    const status = ativ.status.toUpperCase();
-                    let statusClass = 'status-ended';
-                    let statusText = 'FIM JORNADA';
-                    
-                    if (status === 'EM_ANDAMENTO') {
-                        statusClass = 'status-running';
-                        statusText = 'Em Andamento';
-                    } else if (status === 'PAUSADO') {
-                        statusClass = 'status-paused';
-                        statusText = 'Pausado';
-                    }
-                    
-                    // Adiciona a classe 'nova-linha' para um efeito visual de atualização
-                    const row = tbody.insertRow();
-                    row.classList.add('nova-linha');
-                    
-                    row.innerHTML = `
-                        <td>${ativ.funcionario || 'N/A'}</td>
-                        <td>${ativ.etapa || 'N/A'}</td>
-                        <td>${ativ.ultimo_serial || 'N/A'}</td>
-                        <td><span class="${statusClass}">${statusText}</span></td>
-                        <td>${ativ.tempo_formatado || '00:00:00'}</td>
-                    `;
-                });
-            } else {
-                 tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-secondary); padding: 15px;">Nenhuma atividade registrada no momento.</td></tr>';
+        // --- FUNÇÃO PARA RENDERIZAR A TABELA DE ATIVIDADES ---
+        async function atualizarAtividades() {
+            try {
+                const resposta = await fetch("/atividades");
+                const dados = await resposta.json();
+                console.log("Atividades recebidas:", dados);
+                renderAtividades(dados);
+            } catch (erro) {
+                console.error("Erro ao buscar atividades:", erro);
             }
         }
+
+        atualizarAtividades();
+
+        async function carregarAtividades() {
+    try {
+        const resposta = await fetch("/atividades");
+        const atividades = await resposta.json();
+
+        const tabela = document.getElementById("tabela-atividades");
+        if (!tabela) {
+            console.error("Elemento #tabela-atividades não encontrado!");
+            return;
+        }
+
+        tabela.innerHTML = ""; 
+
+        if (!atividades || atividades.length === 0) {
+            tabela.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align:center; color:gray; padding:10px;">
+                        Nenhuma atividade encontrada.
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        for (const ativ of atividades) {
+            const row = document.createElement("tr");
+
+            // Define o texto e ícone do status
+            let statusIcone = "";
+            let statusTexto = "";
+            switch (ativ.status?.toUpperCase()) {
+                case "PAUSADO":
+                    statusIcone = "⏸";
+                    statusTexto = "Pausado";
+                    break;
+                case "FINALIZADO":
+                case "FIM_JORNADA":
+                    statusIcone = "✅";
+                    statusTexto = "Finalizado";
+                    break;
+                case "EM_ANDAMENTO":
+                default:
+                    statusIcone = "⏱";
+                    statusTexto = "Em andamento";
+                    break;
+            }
+
+            let etapaTexto = "";
+            switch (ativ.etapa?.toUpperCase()) {
+                case "ABERTURA_CAIXA":
+                    etapaTexto = "Abertura de Caixa";
+                    break;
+                case "UPGRADE":
+                    etapaTexto = "Upgrade";
+                    break;
+                case "INSTALACAO_IMAGEM":
+                    etapaTexto = "Instalação de Imagem";
+                    break;
+                case "FINALIZACAO_PROD":
+                    etapaTexto = "Finalização/Embalagem";
+                    break;
+            }
+
+            // Monta a linha da tabela
+            row.innerHTML = `
+                <td>${ativ.funcionario || "-"}</td>
+                <td>${etapaTexto || "-"}</td>
+                <td>${ativ.ultimo_serial || "-"}</td>
+                <td>${statusIcone} ${statusTexto}</td>
+                <td class="timer">00:00:00</td>
+            `;
+
+            tabela.appendChild(row);
+
+            // Atualiza o timer baseado na data_hora_criacao
+             const tdTimer = row.querySelector(".timer");
+
+                if (ativ.data_hora_criacao) {
+                    (function(td, dataInicioStr, dataFimStr, status) {
+                        const dataInicio = new Date(dataInicioStr);
+                        const dataFim = dataFimStr ? new Date(dataFimStr) : null;
+                        let elapsedTime;
+
+                        function formatTime(ms) {
+                            const totalSeconds = Math.floor(ms / 1000);
+                            const hours = Math.floor(totalSeconds / 3600);
+                            const minutes = Math.floor((totalSeconds % 3600) / 60);
+                            const seconds = totalSeconds % 60;
+                            return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+                        }
+
+                        // Se tiver dataFim, exibe tempo final; senão, calcula tempo decorrido
+                        if (dataFim) {
+                            elapsedTime = dataFim - dataInicio;
+                            td.textContent = formatTime(elapsedTime);
+                        } else if (status === "EM_ANDAMENTO" || status === "BIP_SERIAL") {
+                            elapsedTime = new Date() - dataInicio - 3 * 60 * 60 * 1000;
+                             td.textContent = formatTime(elapsedTime);
+
+                            const intervalId = setInterval(() => {
+                                elapsedTime += 1000;
+                                td.textContent = formatTime(elapsedTime);
+
+                                // Se o status mudar para finalizado, para o timer
+                                if (status !== "EM_ANDAMENTO" && status !== "BIP_SERIAL") {
+                                    clearInterval(intervalId);
+                                }
+                            }, 1000);
+                        } else {
+                            td.textContent = "00:00:00";
+                        }
+
+                    })(tdTimer, ativ.data_hora_criacao, ativ.data_hora_fim, ativ.status);
+            }
+        }
+
+    } catch (erro) {
+        console.error("Erro ao carregar atividades:", erro);
+    }
+}
+
+
+        // Atualiza automaticamente a cada 5 segundos
+        setInterval(carregarAtividades, 5000);
+
+        // E chama uma vez assim que a página carregar
+        document.addEventListener("DOMContentLoaded", carregarAtividades);
+
 
         async function atualizarPainel() {
             try {
@@ -467,9 +574,6 @@
                     renderMetrics(data.metricas);
                     renderDesempenho(data.desempenho_semanal, data.meta_semanal);
                     
-                    // --- CHAMA A NOVA FUNÇÃO DE ATIVIDADES ---
-                    // Assumindo que a chave de dados é 'atividades_em_andamento'
-                    renderAtividades(data.atividades_em_andamento); 
 
                 }
 

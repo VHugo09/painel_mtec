@@ -447,8 +447,8 @@ def receber_atividade():
         # Insere registro na tabela de seriais bipados
         if dados_recebidos["status"] == "BIP_SERIAL":
             conn.execute(text("""
-                INSERT INTO seriais_bipados_tb (serial, atividade_id, usuario_id)
-                SELECT :serial, :atividade_id, u.id
+                INSERT INTO seriais_bipados_tb (serial, atividade_id, usuario_id,data_hora_bip)
+                SELECT :serial, :atividade_id, u.id, :data_bip
                 FROM atividades_tb a
                 INNER JOIN usuario_tb u ON u.username = :usuario
                 WHERE a.id = :atividade_id
@@ -456,19 +456,83 @@ def receber_atividade():
             """), {
                 "serial": dados_recebidos["serial"],
                 "atividade_id": ultimo.id,
-                "usuario": dados_recebidos["usuario"]
+                "usuario": dados_recebidos["usuario"],
+                "data_bip": agora
             })
 
         conn.commit()
 
-    return jsonify({"mensagem": "Atividade registrada ou atualizada com sucesso"})
+    return jsonify({'mensagem': 'TUDO OK'})
 
-@app.route('/api/atividades', methods=['GET'])
-@login_required
+
+@app.route("/atividades", methods=["GET"])
 def listar_atividades():
-    """Retorna as atividades atuais dos usuários."""
-    global atividades_atuais
-    return jsonify(atividades_atuais if 'atividades_atuais' in globals() else {})
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                a.usuario AS funcionario,
+                a.etapa,
+                COALESCE(sb.serial, 'N/A') AS ultimo_serial,
+                a.status,
+                a.data_hora_criacao,
+                a.data_hora_fim
+            FROM (
+                -- Pega a última atividade de cada usuário
+                SELECT DISTINCT ON (usuario)
+                    id, usuario, etapa, status, data_hora_criacao, data_hora_fim
+                FROM atividades_tb
+                ORDER BY usuario, data_hora_criacao DESC
+            ) a
+            LEFT JOIN LATERAL (
+                -- Pega o último serial bipado daquela atividade
+                SELECT serial
+                FROM seriais_bipados_tb
+                WHERE atividade_id = a.id
+                ORDER BY data_hora_bip DESC
+                LIMIT 1
+            ) sb ON TRUE
+            ORDER BY a.data_hora_criacao DESC
+            LIMIT 10;
+        """)).mappings().all()
+
+        atividades = [dict(row) for row in result]
+        return jsonify(atividades)
+    
+@app.route("/atividade_atual", methods=["GET"])
+def atividade_atual():
+    usuario = request.args.get("usuario")
+    if not usuario:
+        return jsonify({}), 400
+
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                a.id,
+                a.usuario AS funcionario,
+                a.etapa,
+                COALESCE(sb.serial, 'N/A') AS ultimo_serial,
+                a.status,
+                a.data_hora_criacao,
+                a.data_hora_fim
+            FROM atividades_tb a
+            LEFT JOIN LATERAL (
+                SELECT serial
+                FROM seriais_bipados_tb
+                WHERE atividade_id = a.id
+                ORDER BY data_hora_bip DESC
+                LIMIT 1
+            ) sb ON TRUE
+            WHERE a.usuario = :usuario
+            ORDER BY a.data_hora_criacao DESC
+            LIMIT 1
+        """), {"usuario": usuario}).mappings().first()
+
+        if result:
+            atividade = dict(result)
+        else:
+            atividade = {}
+
+    return jsonify(atividade)
 
 @app.route("/pedidos/<int:pedido_id>/historico", methods=["GET"])
 @login_required

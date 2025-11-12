@@ -60,7 +60,7 @@
                         <a class="nav-link {% if request.path == url_for('relatorios_page') %}active{% endif %}" href="{{ url_for('relatorios_page') }}">Gerador de Relatórios</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('bipador_page') %}active{% endif %}" href="{{ url_for('bipador_page') }}">Biapador</a>
+                        <a class="nav-link {% if request.path == url_for('bipador_page') %}active{% endif %}" href="{{ url_for('bipador_page') }}">Bipador</a>
                     </li>
                     {% if session.nivel_acesso == 'admin' %}
                     <li class="nav-item">

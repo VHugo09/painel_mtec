@@ -130,22 +130,40 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+from datetime import timedelta
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username, password = request.form.get("username"), request.form.get("password")
+        username = request.form.get("username")
+        password = request.form.get("password")
         db_session = SessionLocal()
         try:
             user = db_session.query(UsuarioTb).filter_by(username=username).first()
+
             if user and user.check_password(password):
-                session.update({'logged_in': True, 'username': user.username, 'nivel_acesso': user.nivel_acesso})
+                # Sessão persistente
+                session.permanent = True
+                app.permanent_session_lifetime = timedelta(days=7)  # Dura 7 dias
+
+                # Armazena os dados do usuário na sessão
+                session.update({
+                    'logged_in': True,
+                    'username': user.username,
+                    'nivel_acesso': user.nivel_acesso
+                })
+
                 flash("Login efetuado com sucesso!", "success")
                 return redirect(url_for('home'))
+
             else:
                 flash("Credenciais inválidas.", "danger")
+
         finally:
             db_session.close()
+
     return render_template("login.html")
+
 
 @app.route("/logout")
 def logout():
@@ -674,4 +692,4 @@ def relatorios_page():
     return render_template("relatorio.html")
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

@@ -281,7 +281,7 @@ def get_pedidos():
         SELECT p.*, s.nome_status as status, i.nome as imagem_nome FROM public.pedidos_tb p
         LEFT JOIN public.status_td s ON p.status_id = s.id 
         LEFT JOIN public.imagem_td i ON p.imagem_id = i.id
-        WHERE {' AND '.join(where_conditions)} ORDER BY p.urgente DESC, p.prioridade ASC, p.data_criacao ASC
+        WHERE {' AND '.join(where_conditions)} ORDER BY p.urgente DESC,p.status_id = 3 DESC, p.prioridade ASC, p.data_criacao ASC
     """
     with engine.connect() as conn:
         pedidos = [dict(row._mapping) for row in conn.execute(text(query_sql), params)]
@@ -692,4 +692,4 @@ def relatorios_page():
     return render_template("relatorio.html")
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)

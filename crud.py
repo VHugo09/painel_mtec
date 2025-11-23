@@ -401,6 +401,7 @@ def receber_atividade():
     status = str(dados_recebidos.get('status', 'N/A'))
     serial = str(dados_recebidos.get('serial', 'N/A'))
     etapa = str(dados_recebidos.get('etapa', 'N/A'))
+    pv = str(dados_recebidos.get('pv', 'N/A'))
     tempo_total = dados_recebidos.get('tempo_total_segundos','N/A')
     
     # Imprime os dados recebidos no console do servidor para debug
@@ -409,6 +410,7 @@ def receber_atividade():
     print(f"Usuário: {usuario}")
     print(f"Serial: {serial}")
     print(f"Etapa: {etapa}")
+    print(f"PV: {pv}")
     print(f"Tempo: {tempo_total} ")
     print(f"Payload Completo: {json.dumps(dados_recebidos, indent=4)}")
     print("--------------------------------")
@@ -452,14 +454,22 @@ def receber_atividade():
         else:
 
             conn.execute(text("""
-                INSERT INTO atividades_tb (usuario, etapa, status, data_hora_criacao)
-                VALUES (:usuario, :etapa, :status, :data_m)
+                INSERT INTO atividades_tb (usuario, etapa, status, data_hora_criacao, pedido_id)
+                VALUES (
+                              :usuario, 
+                              :etapa, 
+                              :status, 
+                              :data_m,
+                              (SELECT id FROM pedidos_tb WHERE pv = :pv)
+                            
+                            )
             
             """), {
                 "usuario": dados_recebidos["usuario"],
                 "etapa": dados_recebidos["etapa"],
                 "status": dados_recebidos["status"],
-                "data_m": agora
+                "data_m": agora,
+                "pv": dados_recebidos["pv"]
             })
 
         # Insere registro na tabela de seriais bipados

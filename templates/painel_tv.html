@@ -278,37 +278,78 @@
             const container = document.getElementById('prioridades-container');
             if (!container) return;
             container.innerHTML = '';
-            
-            if (Array.isArray(prioridades) && prioridades.length > 0) {
-                prioridades.forEach(p => {
-                    const prioridadeTexto = p.prioridade ? `(${p.prioridade}ª Prioridade)` : '';
-                    const officeIndicator = p.tem_office ? `<span class="info-separator">-</span><span class="office-indicator" title="Inclui Office"><i class="fa-brands fa-windows"></i> Office</span>` : '';
-                    const osIcon = getOsIcon(p.nome_imagem);
-                    const urgentIcon = p.urgente ? `<i class="fa-solid fa-fire" style="color: var(--color-danger);" title="Urgente"></i>` : '';
 
-                    const card = `
-                        <div class="priority-card">
-                            <div>
-                                <h3>${urgentIcon} PV: ${p.pv} ${prioridadeTexto}</h3>
-                                <p><b>Status:</b> ${p.nome_status || 'N/A'}</p>
-                                <p><b>Equipamento:</b> ${p.equipamento || 'N/A'}</p>
-                                <p><b>Serviço:</b> ${p.descricao_servico || 'N/A'}</p>
-                            </div>
-                            <div class="card-footer">
-                                <div class="card-footer-info">
-                                    <span><b>Imagem:</b> ${osIcon} ${p.nome_imagem || 'N/A'}</span>
-                                    ${officeIndicator}
-                                </div>
-                                <span class="maquinas">${p.quantidade || 0} máq.</span>
-                            </div>
-                        </div>
-                    `;
-                    container.innerHTML += card;
-                });
-            } else {
-                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; margin-top: 20px;">Nenhum pedido na fila de prioridades.</p>';
+            function formatTime(ms) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
             }
+
+            prioridades.forEach(p => {
+                const isMontagem = p.nome_status?.toLowerCase() === "em montagem";
+                const osIcon = getOsIcon(p.nome_imagem);
+
+                const idTimer = `timer-${p.id}`;
+
+                const card = `
+                    <div class="priority-card">
+                        <div>
+                            <h3>PV: ${p.pv}</h3>
+                            <p><b>Status:</b> ${p.nome_status}</p>
+                            <p><b>Equipamento:</b> ${p.equipamento}</p>
+                            <p><b>Serviço:</b> ${p.descricao_servico}</p>
+                        </div>
+
+                        <div class="card-footer">
+                            <div class="card-footer-info">
+                                <span><b>Imagem:</b> ${osIcon} ${p.nome_imagem}</span>
+                            </div>
+
+                            <div class="card-footer-info">
+                                <span class="timer" id="${idTimer}">
+                                    <b>Tempo:</b> 00:00:00
+                                </span>
+                            </div>
+
+                            <span class="maquinas">${p.quantidade} máq.</span>
+                        </div>
+                    </div>
+                `;
+
+                container.insertAdjacentHTML('beforeend', card);
+
+                // === CRONÔMETRO ===
+                const timerElement = document.getElementById(idTimer);
+
+                if (p.ultima_mudanca && isMontagem) {
+                    (function(td, dataInicioStr, status) {
+
+                        const dataInicio = new Date(dataInicioStr);
+                        let elapsedTime = new Date() - dataInicio;
+
+                        td.innerHTML = `<b>Tempo:</b> ${formatTime(elapsedTime)}`;
+
+                        const intervalId = setInterval(() => {
+                            elapsedTime += 1000;
+                            td.innerHTML = `<b>Tempo:</b> ${formatTime(elapsedTime)}`;
+
+                            // se sair de "em montagem", parar o cronômetro
+                            if (status.toLowerCase() !== "em montagem") {
+                                clearInterval(intervalId);
+                            }
+
+                        }, 1000);
+
+                    })(timerElement, p.ultima_mudanca, p.nome_status);
+
+                } else {
+                    timerElement.innerHTML = `<b>Tempo:</b> 00:00:00`;
+                }
+            });
         }
+
 
         function renderSimpleList(data, listId, moreId) {
             const listContainer = document.getElementById(listId);

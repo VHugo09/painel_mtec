@@ -60,6 +60,38 @@
             border-color: var(--primary-accent) !important;
             box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.5); /* Sombra suave laranja */
         }
+        .styled-select {
+            background-color: var(--input-bg);
+            color: var(--light-text);
+            border: 2px solid var(--dark-border);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 15px;
+            width: 100%;
+            cursor: pointer;
+            transition: 0.2s;
+            appearance: none; /* Remove seta padrão */
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23cccccc" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
+        /* Hover */
+        .styled-select:hover {
+            border-color: var(--primary-accent);
+        }
+
+        /* Foco com cor de destaque */
+        .styled-select:focus {
+            outline: none;
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.4);
+        }
+
+        /* Placeholder */
+        .styled-select option[disabled] {
+            color: var(--secondary-text);
+        }
     </style>
 </head>
 <body class="bg-dark-bg min-h-screen flex flex-col items-center p-4">
@@ -80,12 +112,10 @@
             <h2 class="text-2xl font-bold text-light-text text-center">Selecione a Etapa Atual</h2>
             
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-secondary-text" for="pv-input">
-                    PV (Pedido de Venda) / Ordem de Produção:
-                </label>
-                <input type="text" id="pv-input" placeholder="Ex: 12345-00"
-                    class="w-full text-lg text-center p-3 border-4 border-dark-border rounded-lg focus-accent focus:outline-none transition duration-150 shadow-inner bg-input-bg placeholder-gray-500 text-light-text"
-                    required>
+                <label for="addPvId">PV (Pedido de Venda) / Ordem de Produção:</label>
+                <select id="addPvId" class="form-select styled-select">
+                    <option value="" disabled selected hidden>Selecione o PV</option>
+                </select>
             </div>
             <div id="etapa-buttons" class="grid grid-cols-2 gap-4">
                 </div>
@@ -190,7 +220,7 @@
         const confirmStepBtn = document.getElementById('confirm-step-btn');
         const currentEtapaDisplay = document.getElementById('current-etapa-display');
         const stepSelectionMessage = document.getElementById('step-selection-message');
-        const pvInput = document.getElementById('pv-input'); // NOVO: Referência ao input da PV
+        const pvInput = document.getElementById('addPvId'); // NOVO: Referência ao input da PV
 
         // Main App Controls
         const display = document.getElementById('timer-display');
@@ -208,6 +238,28 @@
         const SERVER_URL = '/atividade';
 
         // --- FUNÇÕES DE UTILIDADE DE TELA ---
+
+        //Dropdowns
+        async function carregarDropdowns() {
+            try {
+                const resp = await fetch("/pedidos");
+                const lista = await resp.json();
+
+                console.log("Recebido:", lista);
+
+                const select = document.getElementById("addPvId");
+                select.innerHTML = '<option value="" disabled selected hidden>Selecione o PV</option>';
+
+                lista.forEach(pv => {
+                    select.innerHTML += `<option value="${pv.id}">${pv.pv}</option>`;
+                });
+
+            } catch (e) {
+                console.error("Erro ao carregar dropdown:", e);
+            }
+        }
+
+        window.onload = carregarDropdowns;
 
         function showScreen(screenId) {
             stepSelectionScreen.classList.add('hidden');
@@ -262,28 +314,33 @@
         }
 
         function confirmStep() {
-            const pvValue = pvInput.value.trim();
+            const pvSelect = document.getElementById("addPvId");
+            
+            const pvId = pvSelect.value;
+            const pvText = pvSelect.options[pvSelect.selectedIndex].text;
 
             if (!selectedEtapa) return;
 
-            if (!pvValue) {
-                updateStatusMessage("ERRO: Preencha o campo PV/Ordem de Produção.", true);
-                pvInput.focus();
+            if (!pvId) {
+                updateStatusMessage("ERRO: Selecione um PV.", true);
                 return;
             }
             
-            // Armazena a PV no estado do aplicativo
-            selectedPV = pvValue;
+            selectedPV = pvText; // << Exibe o nome do PV
 
-            // Define o display da etapa na tela principal (Adicionando a PV no display)
             currentEtapaDisplay.textContent = `${selectedEtapa.name} | PV: ${selectedPV}`;
 
-            // Atualiza o status inicial e navega para a tela principal
-            updateStatusMessage(`Etapa ${selectedEtapa.name} (PV: ${selectedPV}) iniciada. Pressione START para começar.`, false, true);
-            showScreen('main');
+            updateStatusMessage(
+                `Etapa ${selectedEtapa.name} (PV: ${selectedPV}) iniciada. Pressione START para começar.`,
+                false,
+                true
+            );
 
+            showScreen('main');
             updateButtons();
         }
+
+
 
         function renderEtapaButtons() {
             etapaButtonsContainer.innerHTML = '';
@@ -597,7 +654,7 @@
                 selectedEtapa = { key: atividade.etapa, name: atividade.etapa };
                 selectedPV = atividade.pv || "N/A"; // NOVO: Recupera a PV (se o servidor a retornar)
                 
-                currentEtapaDisplay.textContent = `${atividade.etapa} | PV: ${selectedPV}`; // NOVO: Atualiza o display
+                currentEtapaDisplay.textContent = `${atividade.etapa} | PV: ${atividade.pv}`; // NOVO: Atualiza o display
 
                 showScreen('main');
 

@@ -499,15 +499,17 @@ def listar_atividades():
         result = conn.execute(text("""
             SELECT 
                 a.usuario AS funcionario,
+                
                 a.etapa,
                 COALESCE(sb.serial, 'N/A') AS ultimo_serial,
                 a.status,
                 a.data_hora_criacao,
-                a.data_hora_fim
+                a.data_hora_fim,
+				p.pv
             FROM (
                 -- Pega a última atividade de cada usuário
                 SELECT DISTINCT ON (usuario)
-                    id, usuario, etapa, status, data_hora_criacao, data_hora_fim
+                    id, usuario, etapa, status, data_hora_criacao, data_hora_fim,pedido_id
                 FROM atividades_tb
                 ORDER BY usuario, data_hora_criacao DESC
             ) a
@@ -519,6 +521,7 @@ def listar_atividades():
                 ORDER BY data_hora_bip DESC
                 LIMIT 1
             ) sb ON TRUE
+			LEFT JOIN pedidos_tb p ON p.id = a.pedido_id 
             ORDER BY a.data_hora_criacao DESC
             LIMIT 10;
         """)).mappings().all()
@@ -541,7 +544,8 @@ def atividade_atual():
                 COALESCE(sb.serial, 'N/A') AS ultimo_serial,
                 a.status,
                 a.data_hora_criacao,
-                a.data_hora_fim
+                a.data_hora_fim,
+                p.pv
             FROM atividades_tb a
             LEFT JOIN LATERAL (
                 SELECT serial
@@ -550,6 +554,7 @@ def atividade_atual():
                 ORDER BY data_hora_bip DESC
                 LIMIT 1
             ) sb ON TRUE
+            LEFT JOIN pedidos_tb p ON p.id = a.pedido_id
             WHERE a.usuario = :usuario
             ORDER BY a.data_hora_criacao DESC
             LIMIT 1

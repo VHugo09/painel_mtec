@@ -93,7 +93,7 @@ class AtividadesTb(Base):
 
 # --- FUNÇÃO PARA POPULAR DADOS INICIAIS ---
 def popular_dados_iniciais(db_session):
-    status_iniciais = ["Aguardando Chegada", "Backlog", "Em Montagem", "Concluído", "Pendente", "Cancelado"]
+    status_iniciais = ["Aguardando Chegada","Finalizar WMS", "Backlog", "Em Montagem", "Concluído", "Pendente", "Cancelado"]
     imagens_iniciais = ["W11 PRO", "W11 PRO ETQ", "Linux", "SLUI (SOLUÇÃO DE PROBLEMAS)", "FREEDOS"]
     try:
         if db_session.query(StatusTd).count() == 0:
@@ -260,6 +260,7 @@ def get_pedidos():
 
     if filtro_tab == 'concluido': where_conditions.append("p.status_id = 4")
     elif filtro_tab == 'cancelado': where_conditions.append("p.status_id = 6")
+    elif filtro_tab == 'finalizar_wms': where_conditions.append("p.status_id = 0")
     else:
         where_conditions.append("p.status_id NOT IN (4, 6)")
         if not busca_mes and not busca_ano:
@@ -269,7 +270,8 @@ def get_pedidos():
         where_conditions.append("(p.pv ILIKE :busca OR p.codigo_pedido ILIKE :busca)")
         params['busca'] = f"%{busca_texto}%"
     
-    coluna_data = "p.data_criacao" if filtro_tab != 'concluido' and filtro_tab != 'cancelado' else "p.data_conclusao"
+    coluna_data = "p.data_criacao" if filtro_tab not in ['concluido', 'cancelado', 'finalizar_wms'] else "p.data_conclusao"
+
     if busca_mes:
         where_conditions.append(f"EXTRACT(MONTH FROM {coluna_data}) = :mes")
         params['mes'] = int(busca_mes)
@@ -602,7 +604,7 @@ def gerar_relatorio_api():
                 COALESCE(SUM(p.quantidade), 0) as total_unidades
             FROM pedidos_tb p
             JOIN status_td s ON p.status_id = s.id
-            WHERE s.nome_status IN ('Concluído', 'Cancelado')
+            WHERE s.nome_status IN ('Concluído', 'Cancelado', 'Finalizar WMS')
               AND p.data_conclusao BETWEEN :start_date AND :end_date
             GROUP BY status, tipo;
         """)

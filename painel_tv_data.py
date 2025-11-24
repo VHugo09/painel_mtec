@@ -108,13 +108,13 @@ def get_painel_data():
                 df_full.loc[df_full['data_conclusao'].notna(), 'data_conclusao'].dt.tz_convert(FUSO_BRASILIA)
 
         # --- Lógica de Negócio (cálculos) ---
-        STATUS_ID_CONCLUIDO, STATUS_ID_CANCELADO, STATUS_ID_PENDENTE, STATUS_ID_BACKLOG, STATUS_ID_AGUARDANDO, STATUS_ID_MONTAGEM = 4, 6, 5, 2, 1, 3
+        STATUS_ID_CONCLUIDO, STATUS_ID_CANCELADO, STATUS_ID_PENDENTE, STATUS_ID_BACKLOG, STATUS_ID_AGUARDANDO, STATUS_ID_MONTAGEM, STATUS_ID_FINALIZARWMS= 4, 6, 5, 2, 1, 3, 0
 
         hoje = datetime.now(FUSO_BRASILIA)
         inicio_do_dia = hoje.replace(hour=0, minute=0, second=0, microsecond=0)
         inicio_mes_atual = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        df_em_andamento = df_full[~df_full['status_id'].isin([STATUS_ID_CONCLUIDO, STATUS_ID_CANCELADO])].copy()
+        df_em_andamento = df_full[~df_full['status_id'].isin([STATUS_ID_CONCLUIDO, STATUS_ID_CANCELADO, STATUS_ID_FINALIZARWMS])].copy()
 
         prioridades_df = df_em_andamento[~df_em_andamento['status_id'].isin([STATUS_ID_AGUARDANDO, STATUS_ID_PENDENTE])].head(4).copy()
         prioridades_ids = set(prioridades_df['id'].tolist())

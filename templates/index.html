@@ -14,6 +14,11 @@
         color: white; 
         box-shadow: 0 4px 15px -5px rgba(255, 102, 0, 0.6);
     }
+    #pills-finalizarwms-tab.active {
+        background-color: rgba(48, 78, 219, 0.8);
+        box-shadow: 0 4px 15px -5px rgba(48, 78, 219, 0.8);
+    }
+
     #pills-concluidos-tab.active { 
         background-color: var(--bs-success) !important; 
         box-shadow: 0 4px 15px -5px rgba(25, 135, 84, 0.6); 
@@ -63,6 +68,7 @@
 
 <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" id="pills-andamento-tab" data-bs-toggle="pill" data-bs-target="#pills-andamento" type="button">Em Andamento</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="pills-finalizarwms-tab" data-bs-toggle="pill" data-bs-target="#pills-finalizarwms" type="button">Finalizar WMS</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="pills-concluidos-tab" data-bs-toggle="pill" data-bs-target="#pills-concluidos" type="button">Concluídos</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="pills-cancelados-tab" data-bs-toggle="pill" data-bs-target="#pills-cancelados" type="button">Cancelados</button></li>
 </ul>
@@ -77,6 +83,18 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaPedidosAndamento"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="pills-finalizarwms" role="tabpanel">
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>OP/PV</th> <th>Equipamento</th> <th>Qtd.</th> <th>Serviço</th> <th>Imagem</th> <th>Status</th> <th>Criado por</th> <th>Data Criação</th> <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaPedidosFinalizarwms"></tbody>
             </table>
         </div>
     </div>
@@ -375,6 +393,8 @@
             carregarPedidos('andamento', 'tabelaPedidosAndamento');
         } else if (activeTab.id === 'pills-concluidos-tab') {
             carregarPedidos('concluido', 'tabelaPedidosConcluidos');
+        } else if (activeTab.id == 'pills-finalizarwms-tab') {
+            carregarPedidos('finalizarwms', 'tabelaPedidosFinalizarwms')
         } else if (activeTab.id === 'pills-cancelados-tab') {
             carregarPedidos('cancelado', 'tabelaPedidosCancelados');
         }
@@ -462,6 +482,7 @@
     });
 
     document.getElementById('pills-andamento-tab').addEventListener('click', () => carregarPedidos('andamento', 'tabelaPedidosAndamento'));
+    document.getElementById('pills-finalizarwms-tab').addEventListener('click', () => carregarPedidos('finalizarwms', 'tabelaPedidosFinalizarwms'));
     document.getElementById('pills-concluidos-tab').addEventListener('click', () => carregarPedidos('concluido', 'tabelaPedidosConcluidos'));
     document.getElementById('pills-cancelados-tab').addEventListener('click', () => carregarPedidos('cancelado', 'tabelaPedidosCancelados'));
     

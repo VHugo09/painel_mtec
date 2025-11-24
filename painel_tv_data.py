@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import pytz
 import traceback
+pd.set_option('future.no_silent_downcasting', True)
 
 # --- CONFIGURAÇÕES ---
 DB_URL = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://postgres:2025@localhost:5432/pedidos_db')
@@ -87,7 +88,7 @@ def get_painel_data():
             return dados_vazios
 
         # --- Processamento e Limpeza de Dados ---
-        df_full.fillna({
+        df_full = df_full.fillna({
             'nome_status': 'Não Definido',
             'pv': 'N/A',
             'equipamento': 'Não informado',
@@ -95,9 +96,7 @@ def get_painel_data():
             'nome_imagem': 'N/A',
             'urgente': False,
             'tem_office': False
-        }, inplace=True)
-        # evita o FutureWarning sobre downcasting automático
-        df_full.infer_objects(copy=False)
+        }).infer_objects(copy=False)
 
         df_full['quantidade'] = pd.to_numeric(df_full['quantidade'], errors='coerce').fillna(0).astype(int)
         df_full['prioridade'] = pd.to_numeric(df_full['prioridade'], errors='coerce').fillna(9999).astype(int)

@@ -403,6 +403,7 @@ def receber_atividade():
     status = str(dados_recebidos.get('status', 'N/A'))
     serial = str(dados_recebidos.get('serial', 'N/A'))
     etapa = str(dados_recebidos.get('etapa', 'N/A'))
+    pv = str(dados_recebidos.get('pv', 'N/A'))
     tempo_total = dados_recebidos.get('tempo_total_segundos','N/A')
     
     # Imprime os dados recebidos no console do servidor para debug
@@ -411,6 +412,7 @@ def receber_atividade():
     print(f"Usuário: {usuario}")
     print(f"Serial: {serial}")
     print(f"Etapa: {etapa}")
+    print(f"PV: {pv}")
     print(f"Tempo: {tempo_total} ")
     print(f"Payload Completo: {json.dumps(dados_recebidos, indent=4)}")
     print("--------------------------------")
@@ -454,14 +456,22 @@ def receber_atividade():
         else:
 
             conn.execute(text("""
-                INSERT INTO atividades_tb (usuario, etapa, status, data_hora_criacao)
-                VALUES (:usuario, :etapa, :status, :data_m)
+                INSERT INTO atividades_tb (usuario, etapa, status, data_hora_criacao, pedido_id)
+                VALUES (
+                              :usuario, 
+                              :etapa, 
+                              :status, 
+                              :data_m,
+                              (SELECT id FROM pedidos_tb WHERE pv = :pv)
+                            
+                            )
             
             """), {
                 "usuario": dados_recebidos["usuario"],
                 "etapa": dados_recebidos["etapa"],
                 "status": dados_recebidos["status"],
-                "data_m": agora
+                "data_m": agora,
+                "pv": dados_recebidos["pv"]
             })
 
         # Insere registro na tabela de seriais bipados
@@ -491,15 +501,17 @@ def listar_atividades():
         result = conn.execute(text("""
             SELECT 
                 a.usuario AS funcionario,
+                
                 a.etapa,
                 COALESCE(sb.serial, 'N/A') AS ultimo_serial,
                 a.status,
                 a.data_hora_criacao,
-                a.data_hora_fim
+                a.data_hora_fim,
+				p.pv
             FROM (
                 -- Pega a última atividade de cada usuário
                 SELECT DISTINCT ON (usuario)
-                    id, usuario, etapa, status, data_hora_criacao, data_hora_fim
+                    id, usuario, etapa, status, data_hora_criacao, data_hora_fim,pedido_id
                 FROM atividades_tb
                 ORDER BY usuario, data_hora_criacao DESC
             ) a
@@ -511,6 +523,7 @@ def listar_atividades():
                 ORDER BY data_hora_bip DESC
                 LIMIT 1
             ) sb ON TRUE
+			LEFT JOIN pedidos_tb p ON p.id = a.pedido_id 
             ORDER BY a.data_hora_criacao DESC
             LIMIT 10;
         """)).mappings().all()
@@ -533,7 +546,8 @@ def atividade_atual():
                 COALESCE(sb.serial, 'N/A') AS ultimo_serial,
                 a.status,
                 a.data_hora_criacao,
-                a.data_hora_fim
+                a.data_hora_fim,
+                p.pv
             FROM atividades_tb a
             LEFT JOIN LATERAL (
                 SELECT serial
@@ -542,6 +556,7 @@ def atividade_atual():
                 ORDER BY data_hora_bip DESC
                 LIMIT 1
             ) sb ON TRUE
+            LEFT JOIN pedidos_tb p ON p.id = a.pedido_id
             WHERE a.usuario = :usuario
             ORDER BY a.data_hora_criacao DESC
             LIMIT 1

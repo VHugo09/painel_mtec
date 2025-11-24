@@ -39,13 +39,20 @@ def get_painel_data():
             p.id, p.status_id, p.equipamento, p.pv, p.descricao_servico,
             s.nome_status, p.data_criacao, p.quantidade, p.urgente,
             p.data_conclusao, i.nome as nome_imagem, p.prioridade,
-            p.tem_office
+            p.tem_office, hs.data_mudanca as ultima_mudanca
         FROM 
             pedidos_tb p
         LEFT JOIN
             status_td s ON p.status_id = s.id
         LEFT JOIN                               
             imagem_td i ON p.imagem_id = i.id
+        LEFT JOIN (
+		    SELECT 
+		        pedido_id,
+		        MAX(data_mudanca) AS data_mudanca
+		    FROM historico_status_tb
+		    GROUP BY pedido_id
+		) AS hs ON hs.pedido_id = p.id
         ORDER BY
             p.urgente DESC, p.prioridade ASC;
     """)

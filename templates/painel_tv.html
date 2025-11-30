@@ -290,6 +290,7 @@
             prioridades.forEach(p => {
                 const isMontagem = p.nome_status?.toLowerCase() === "em montagem";
                 const osIcon = getOsIcon(p.nome_imagem);
+                const officeIndicator = p.tem_office ? `<span class="info-separator">-</span><span class="office-indicator" title="Inclui Office"><i class="fa-brands fa-windows"></i> Office</span>` : '';
 
                 const idTimer = `timer-${p.id}`;
 
@@ -305,6 +306,7 @@
                         <div class="card-footer">
                             <div class="card-footer-info">
                                 <span><b>Imagem:</b> ${osIcon} ${p.nome_imagem}</span>
+                                ${officeIndicator}
                             </div>
 
                             <div class="card-footer-info">

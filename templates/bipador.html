@@ -76,6 +76,7 @@
             background-position: right 10px center;
         }
 
+
         /* Hover */
         .styled-select:hover {
             border-color: var(--primary-accent);
@@ -116,6 +117,18 @@
                 <select id="addPvId" class="form-select styled-select">
                     <option value="" disabled selected hidden>Selecione o PV</option>
                 </select>
+            </div>
+            <div id="caixas-container" style="display: none; margin-top: 10px;">
+                <label for="qtd-caixas">Quantas caixas quer abrir vagabundo?</label>
+                <input      
+                    class="form-control styled-select"
+                    style="width: 100%;"
+                    type="number"   
+                    id="qtd-caixas" 
+                    class="form-control" 
+                    min="1" 
+                    placeholder="Digite a quantidade"
+                >
             </div>
             <div id="etapa-buttons" class="grid grid-cols-2 gap-4">
                 </div>
@@ -220,7 +233,9 @@
         const confirmStepBtn = document.getElementById('confirm-step-btn');
         const currentEtapaDisplay = document.getElementById('current-etapa-display');
         const stepSelectionMessage = document.getElementById('step-selection-message');
-        const pvInput = document.getElementById('addPvId'); // NOVO: Referência ao input da PV
+        const pvInput = document.getElementById('addPvId');
+        const quantidadeContainer = document.getElementById("quantidade-container");
+        const quantidadeInput = document.getElementById("quantidade-input");
 
         // Main App Controls
         const display = document.getElementById('timer-display');
@@ -280,6 +295,12 @@
 
         function selectEtapa(etapaObject) {
             selectedEtapa = etapaObject;
+
+            if (etapaObject.key === "ABERTURA_CAIXA") {
+                document.getElementById("caixas-container").style.display = "block";
+            } else {
+                document.getElementById("caixas-container").style.display = "none";
+            }
             
             // Atualiza o feedback visual na tela de seleção
             Array.from(etapaButtonsContainer.children).forEach(btn => {
@@ -314,20 +335,37 @@
         }
 
         function confirmStep() {
+            if (!selectedEtapa) {
+                updateStatusMessage("ERRO: Selecione uma etapa.", true);
+                return;
+            }
+
             const pvSelect = document.getElementById("addPvId");
-            
             const pvId = pvSelect.value;
             const pvText = pvSelect.options[pvSelect.selectedIndex].text;
-
-            if (!selectedEtapa) return;
 
             if (!pvId) {
                 updateStatusMessage("ERRO: Selecione um PV.", true);
                 return;
             }
-            
-            selectedPV = pvText; // << Exibe o nome do PV
 
+            let qtdCaixas = null;
+
+            if (selectedEtapa.key === "ABERTURA_CAIXA") {
+                const caixasInput = document.getElementById("qtd-caixas");
+                qtdCaixas = caixasInput.value.trim();
+
+                if (!qtdCaixas || Number(qtdCaixas) <= 0) {
+                    updateStatusMessage("ERRO: Preencha a quantidade de caixas.", true);
+                    caixasInput.focus();
+                    return;
+                }
+            }
+
+            // Salva o PV pelo nome
+            selectedPV = pvText;
+
+            // Exibe etapa + PV no topo
             currentEtapaDisplay.textContent = `${selectedEtapa.name} | PV: ${selectedPV}`;
 
             updateStatusMessage(
@@ -339,6 +377,7 @@
             showScreen('main');
             updateButtons();
         }
+
 
 
 
